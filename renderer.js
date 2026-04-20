@@ -126,7 +126,10 @@ async function initFirebase() {
         db = firebase.firestore();
 
         updateStatus("Ready!");
-        setTimeout(finishLoading, 1000);
+
+        // Quality of Life: Initialize room explicitly and wait for it
+        await db.collection("rooms").doc(roomId).set({ status: "idle", requestConnect: false });
+        finishLoading();
 
         setupTutorListener();
         speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
@@ -162,11 +165,50 @@ function setupTutorListener() {
             overlay.classList.remove('visible');
             partnerStatus.classList.add('connected');
 
+            // Integrate Disconnect into the button
+            connectBtn.innerText = "Disconnect";
+            connectBtn.disabled = false;
+            connectBtn.onclick = () => window.disconnectBuddy();
+            connectBtn.style.background = "#ff7675"; // Red for disconnect
+
+            // QoL: Update badge text and style
+            idBadge.innerText = "Connected 🟢";
+            idBadge.style.color = '#00b894';
+            idBadge.style.background = 'white';
+            idBadge.style.opacity = '1';
+
+            // QoL Tweak: Hide badge after 5 seconds for a cleaner look
+            if (!window.badgeHideTimeout) {
+                window.badgeHideTimeout = setTimeout(() => {
+                    idBadge.style.opacity = '0';
+                    idBadge.style.pointerEvents = 'none'; // Don't let it block clicks
+                }, 5000);
+            }
+
             // If they connected to US, we should know their room ID to talk back
             if (data.requesterCode && !partnerRoomId) {
                 partnerRoomId = "hack-" + data.requesterCode;
                 console.log("Partner room identified:", partnerRoomId);
             }
+        } else if (data.status === "idle") {
+            // QoL: Reset everything if we go back to idle
+            overlay.classList.remove('visible');
+            partnerStatus.classList.remove('connected');
+            idBadge.style.display = 'block';
+            idBadge.style.opacity = '1';
+            idBadge.style.pointerEvents = 'auto';
+
+            // Reset button to Connect mode
+            connectBtn.innerText = "Connect";
+            connectBtn.disabled = false;
+            connectBtn.onclick = () => window.requestConnectionUI();
+            connectBtn.style.background = "#6c5ce7"; // Original purple
+
+            if (window.badgeHideTimeout) {
+                clearTimeout(window.badgeHideTimeout);
+                window.badgeHideTimeout = null;
+            }
+            finishLoading();
         } else {
             partnerStatus.classList.remove('connected');
         }
@@ -210,6 +252,31 @@ window.rejectTutor = () => {
     db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
     overlay.classList.remove('visible');
 };
+
+window.disconnectBuddy = async () => {
+    speak("Disconnecting...");
+
+    // 1. Reset your own room
+    await db.collection("rooms").doc(roomId).update({
+        status: "idle",
+        requestConnect: false
+    });
+
+    // 2. Reset your partner's room if possible
+    if (partnerRoomId) {
+        await db.collection("rooms").doc(partnerRoomId).update({
+            status: "idle",
+            requestConnect: false
+        });
+        partnerRoomId = null;
+    }
+
+    // 3. UI Cleanup
+    controlPanel.classList.remove('visible');
+    finishLoading();
+    speak("Disconnected. Time for a break!");
+};
+
 
 // --- 6. TUTOR/BUDDY SEND COMMANDS ---
 window.requestConnectionUI = async () => {
