@@ -8,6 +8,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
+        :root {
+            --buddy-c1: #6c5ce7;
+            --buddy-c2: #a29bfe;
+        }
+        
         body {
             margin: 0;
             padding: 0;
@@ -32,23 +37,41 @@
             /* Let clicks pass through empty space */
         }
 
+        /* Physics Wrapper */
+        #physics-animator {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: float 3s ease-in-out infinite;
+            transform-origin: bottom center; /* Better jelly base */
+        }
+
         /* The Robot Character */
         .buddy {
             position: relative;
             width: 120px;
             height: 140px;
-            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            background: linear-gradient(135deg, var(--buddy-c1), var(--buddy-c2));
             border-radius: 20px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            animation: float 3s ease-in-out infinite;
             pointer-events: auto;
             /* Make the buddy itself clickable */
             cursor: grab;
-            transition: transform 0.1s ease-out;
+            transition: transform 0.1s ease-out, border-radius 0.4s ease, clip-path 0.4s ease;
+        }
+
+        /* Shape Customizations */
+        .buddy.shape-circle { border-radius: 50%; }
+        .buddy.shape-square { border-radius: 5px; }
+        .buddy.shape-triangle { 
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            border-radius: 0;
+            box-shadow: none; /* Shadow breaks on clip path */
         }
 
         .buddy:active {
@@ -167,7 +190,7 @@
         /* Speech Bubble */
         .bubble {
             position: absolute;
-            bottom: 220px;
+            bottom: 280px; /* Shifted higher up to clear the buddy */
             background: white;
             padding: 15px;
             border-radius: 15px;
@@ -176,7 +199,8 @@
             opacity: 0;
             transform: translateY(10px);
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: auto;
+            pointer-events: none; /* Do not block clicks */
+            z-index: 9998; /* High, but under UI badges */
         }
 
         .bubble.visible {
@@ -213,10 +237,11 @@
             font-weight: bold;
             color: #6c5ce7;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            z-index: 100;
+            z-index: 9999; /* Max Priority */
             cursor: pointer;
             border: 1px solid #a29bfe;
             transition: all 0.2s;
+            pointer-events: auto !important; 
         }
 
         .id-badge:hover {
@@ -227,8 +252,13 @@
         #name-input-container {
             position: absolute;
             top: 20px;
-            z-index: 101;
+            z-index: 9999; /* Max Priority */
             display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            pointer-events: auto !important;
         }
 
         #name-input-container input {
@@ -332,7 +362,7 @@
             height: 50px;
             margin-top: -25px;
             margin-left: -25px;
-            background: #6c5ce7;
+            background: var(--buddy-c1);
             color: white;
             border: 2px solid white;
             border-radius: 50%;
@@ -347,7 +377,7 @@
 
         .radial-btn:hover {
             transform: scale(1.15);
-            background: #a29bfe;
+            background: var(--buddy-c2);
         }
 
         .btn-fire {
@@ -370,14 +400,45 @@
             background: #ff7675;
         }
 
+        .btn-purple { background: #6c5ce7; }
+        .btn-yellow { background: #fdcb6e; color: #000; }
+        .btn-pink { background: #fd79a8; }
+        .btn-white { background: #ffffff; color: #000; border-color: #ddd; }
+
         /* Hats Overlay Layer */
         .hat-layer {
             position: absolute;
-            top: -40px;
-            font-size: 40px;
+            top: -55px;
+            font-size: 50px; 
             z-index: 10;
             pointer-events: none;
             transition: transform 0.3s;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* Real CSS Cowboy Hat */
+        .real-cowboy-hat {
+            display: none; /* Shown via JS */
+            width: 70px;
+            height: 12px;
+            background: #5d4037;
+            border-radius: 5px 5px 15px 15px;
+            position: relative;
+            top: 40px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .real-cowboy-hat::after {
+            content: '';
+            position: absolute;
+            top: -18px;
+            left: 15px;
+            width: 40px;
+            height: 22px;
+            background: #5d4037;
+            border-radius: 8px 8px 0 0;
+            box-shadow: inset 0 -4px 0 #3e2723;
         }
 
         /* Bottom Input Bar for text tasks */
@@ -566,13 +627,18 @@
         <div id="buddy-bubble" class="bubble">
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
         </div>
-        <div id="main-buddy" class="buddy">
-            <div id="hat-overlay" class="hat-layer"></div>
-            <div class="eyes">
-                <div class="eye"></div>
-                <div class="eye"></div>
+        <div id="physics-animator">
+            <div id="hat-overlay" class="hat-layer">
+                <span id="emoji-hat-span"></span>
+                <div id="css-cowboy-hat" class="real-cowboy-hat"></div>
             </div>
-            <div id="buddy-mouth" class="mouth"></div>
+            <div id="main-buddy" class="buddy">
+                <div class="eyes">
+                    <div class="eye"></div>
+                    <div class="eye"></div>
+                </div>
+                <div id="buddy-mouth" class="mouth"></div>
+            </div>
         </div>
     </div>
 

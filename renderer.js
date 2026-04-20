@@ -12,6 +12,7 @@ const bubble = document.getElementById('buddy-bubble');
 const text = document.getElementById('buddy-text');
 const mouth = document.getElementById('buddy-mouth');
 const buddy = document.getElementById('main-buddy');
+const physicsAnimator = document.getElementById('physics-animator');
 const overlay = document.getElementById('connect-overlay');
 const idBadge = document.getElementById('id-badge');
 const nameInputContainer = document.getElementById('name-input-container');
@@ -25,6 +26,9 @@ let db = null;
 let partnerRoomId = null;
 let requesterCode = null;
 let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
+let buddyColor = JSON.parse(localStorage.getItem('buddy-color')) || { c1: '#6c5ce7', c2: '#a29bfe' };
+let buddyHat = localStorage.getItem('buddy-hat') || 'none';
+let buddyShape = localStorage.getItem('buddy-shape') || 'default';
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
 // --- 2.1 TTS STATE ---
@@ -46,7 +50,6 @@ function initTTS() {
 
 function updateSelectedVoice() {
     const englishVoices = voices.filter(v => v.lang.startsWith('en'));
-    // Heuristic filters for Male/Female names
     const maleCandidates = ['david', 'mark', 'george', 'male', 'james', 'microsoft david'];
     const femaleCandidates = ['zira', 'hazel', 'susan', 'female', 'linda', 'microsoft zira'];
 
@@ -81,7 +84,7 @@ function speakVerbal(message) {
         if (mouth) {
             mouth.style.height = '15px';
             mouth.style.borderRadius = '50%';
-            mouth.style.background = '#ff7675'; // Tint red while speaking
+            mouth.style.background = '#ff7675';
         }
     };
 
@@ -96,7 +99,7 @@ function speakVerbal(message) {
     window.speechSynthesis.speak(utterance);
 }
 
-// --- 3. BASIC BUDDY FUNCTIONS (ALWAYS WORK) ---
+// --- 3. BASIC BUDDY FUNCTIONS ---
 function speak(message, duration = 3000) {
     console.log("Buddy says:", message);
     if (!text || !bubble || !mouth) return;
@@ -115,14 +118,14 @@ function speak(message, duration = 3000) {
 function updateStatus(status) {
     if (idBadge) {
         idBadge.innerText = status;
-        idBadge.style.color = '#e17055'; // Orange-ish while loading
+        idBadge.style.color = '#e17055'; 
     }
 }
 
 function finishLoading() {
     if (idBadge) {
         idBadge.innerText = `${buddyName} | Code: ${roomId.replace('hack-', '')}`;
-        idBadge.style.color = '#6c5ce7'; // Purple when ready
+        idBadge.style.color = '#6c5ce7'; 
     }
 }
 
@@ -131,18 +134,19 @@ let isDragging = false;
 let dragOffsetX = 0, dragOffsetY = 0;
 let dragMoved = false;
 
-if (buddy) {
-    buddy.addEventListener('pointerdown', (e) => {
+if (physicsAnimator) {
+    physicsAnimator.addEventListener('pointerdown', (e) => {
         isDragging = true;
         dragMoved = false;
         dragOffsetX = e.clientX;
         dragOffsetY = e.clientY;
-        buddy.setPointerCapture(e.pointerId);
+        physicsAnimator.setPointerCapture(e.pointerId);
+        
+        physicsAnimator.style.animation = 'none'; 
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
-    // Fallback double click if needed
-    buddy.addEventListener('dblclick', () => {
+    physicsAnimator.addEventListener('dblclick', () => {
         window.openRadialMenu('main');
     });
 }
@@ -150,97 +154,76 @@ if (buddy) {
 window.addEventListener('pointerup', (e) => {
     if (isDragging) {
         isDragging = false;
-        if (buddy && buddy.hasPointerCapture(e.pointerId)) {
-            buddy.releasePointerCapture(e.pointerId);
+        if (physicsAnimator && physicsAnimator.hasPointerCapture(e.pointerId)) {
+            physicsAnimator.releasePointerCapture(e.pointerId);
+        }
+        
+        if (physicsAnimator) {
+            physicsAnimator.style.animation = 'float 3s ease-in-out infinite';
         }
 
-
-        // If they didn't really move the mouse, treat as a click to open menu
         if (!dragMoved) {
             window.openRadialMenu('main');
         }
     }
 });
+
 window.addEventListener('pointermove', (e) => {
     if (isDragging) {
         if (Math.abs(e.clientX - dragOffsetX) > 3 || Math.abs(e.clientY - dragOffsetY) > 3) {
             dragMoved = true;
-            closeRadialMenu(); // hide if dragging
+            closeRadialMenu();
             closeBottomBar();
         }
         ipcRenderer.send('move-window-absolute', e.screenX - dragOffsetX, e.screenY - dragOffsetY);
         return;
     }
 
-    // Check if mouse is over UI elements
-    const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overRadial = radialContainer && (document.elementFromPoint(e.clientX, e.clientY) === radialContainer || radialContainer.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overBottomBar = bottomBar && (document.elementFromPoint(e.clientX, e.clientY) === bottomBar || bottomBar.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const overBuddy = buddy && (el === buddy || buddy.contains(el));
+    const overBadge = idBadge && (el === idBadge || idBadge.contains(el));
+    const overNameInput = nameInputContainer && (el === nameInputContainer || nameInputContainer.contains(el));
+    const overRadial = radialContainer && (el === radialContainer || radialContainer.contains(el));
+    const overBottomBar = bottomBar && (el === bottomBar || bottomBar.contains(el));
+    const overPhysics = physicsAnimator && (el === physicsAnimator || physicsAnimator.contains(el));
     const isOverlayVisible = overlay && overlay.classList.contains('visible');
+    const overRadialBtn = el && el.closest('.radial-btn');
+    const overInput = el && (el.tagName === 'INPUT' || el.tagName === 'BUTTON');
 
-    if (!overBuddy && !overBubble && !overBadge && !overRadial && !overBottomBar && !isOverlayVisible) {
+    if (!overBuddy && !overBadge && !overNameInput && !overRadial && !overBottomBar && !isOverlayVisible && !overRadialBtn && !overInput && !overPhysics) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
     }
 });
 
-// Wander Mode - Disabled to prevent random jumping
-// setInterval(() => {
-//     if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
-//     ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
-// }, 10000);
-
-// --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
+// --- 5. FIREBASE INITIALIZATION ---
 async function initFirebase() {
-    updateStatus("Loading Bridge...");
-
+    updateStatus("Connecting...");
     try {
-        // Use global 'firebase' from the CDN script
         if (typeof firebase === 'undefined') {
             throw new Error("Firebase CDN scripts failed to load.");
         }
 
         const firebaseConfig = require('./firebase-config.js');
 
-        updateStatus("Connecting DB...");
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-
-        updateStatus("Ready!");
-
-        // Quality of Life: Initialize room explicitly and wait for it
         await db.collection("rooms").doc(roomId).set({ status: "idle", requestConnect: false });
         finishLoading();
-
         setupTutorListener();
-        speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
-
     } catch (err) {
-        console.error("Firebase Init Error:", err);
+        console.error("Firebase Error:", err);
         updateStatus("Offline Mode");
-        // Speak the error for debugging
-        const errMsg = err.message || "Unknown error";
-        speak(`Error: ${errMsg.substring(0, 40)}`);
-        setTimeout(finishLoading, 6000);
+        setTimeout(finishLoading, 3000);
     }
 }
 
 function setupTutorListener() {
     if (!db) return;
     db.collection("rooms").doc(roomId).onSnapshot((doc) => {
-        // Blink on data receipt
-        if (buddy) {
-            buddy.style.boxShadow = '0 0 30px #a29bfe';
-            setTimeout(() => buddy.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)', 200);
-        }
-
         const data = doc.data();
         if (!data) return;
-
-        // 1. Connection Request Logic
         if (data.requestConnect && data.status !== "connected") {
             requesterCode = data.requesterCode;
             connectRequestText.innerText = `Buddy ${requesterCode} wants to connect!`;
@@ -248,48 +231,17 @@ function setupTutorListener() {
         } else if (data.status === "connected") {
             overlay.classList.remove('visible');
             window.isPartnerConnected = true;
-
-            // QoL: Update badge text and style
             idBadge.innerText = "Connected 🟢";
-            idBadge.style.color = '#00b894';
-            idBadge.style.background = 'white';
-            idBadge.style.opacity = '1';
-
-            if (!window.badgeHideTimeout) {
-                window.badgeHideTimeout = setTimeout(() => {
-                    idBadge.style.opacity = '0';
-                    idBadge.style.pointerEvents = 'none';
-                }, 5000);
-            }
-
-            if (data.requesterCode && !partnerRoomId) {
-                partnerRoomId = "hack-" + data.requesterCode;
-                console.log("Partner room identified:", partnerRoomId);
-            }
+            if (data.requesterCode && !partnerRoomId) partnerRoomId = "hack-" + data.requesterCode;
         } else if (data.status === "idle") {
             overlay.classList.remove('visible');
             window.isPartnerConnected = false;
-
-            idBadge.style.display = 'block';
-            idBadge.style.opacity = '1';
-            idBadge.style.pointerEvents = 'auto';
-
-            if (window.badgeHideTimeout) {
-                clearTimeout(window.badgeHideTimeout);
-                window.badgeHideTimeout = null;
-            }
             finishLoading();
-        } else {
-            window.isPartnerConnected = false;
         }
-
-        // 2. Incoming Messages
         if (data.status === "connected" && data.lastMessage && data.lastMessageTimestamp > (window.lastProcessedMsg || 0)) {
             speak(data.lastMessage);
             window.lastProcessedMsg = data.lastMessageTimestamp;
         }
-
-        // 3. Remote Commands
         if (data.status === "connected" && data.command) {
             handleRemoteCommand(data.command);
             db.collection("rooms").doc(roomId).update({ command: null });
@@ -297,25 +249,20 @@ function setupTutorListener() {
     });
 }
 
-
 function handleRemoteCommand(cmd) {
     if (cmd.type === 'wiggle') {
         buddy.style.animation = 'wiggle 0.5s ease infinite';
         setTimeout(() => buddy.style.animation = 'float 3s ease-in-out infinite', 2000);
     } else if (cmd.type === 'emoji') {
         speak(cmd.value);
-    } else if (cmd.type === 'move') {
-        ipcRenderer.send('move-window', cmd.x, cmd.y);
     }
 }
 
 window.acceptBuddyUI = () => {
     if (!requesterCode) return;
-
     partnerRoomId = "hack-" + requesterCode;
     db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
     overlay.classList.remove('visible');
-    speak("We're connected!");
 };
 
 window.rejectTutor = () => {
@@ -324,74 +271,29 @@ window.rejectTutor = () => {
 };
 
 window.disconnectBuddy = async () => {
-    speak("Disconnecting...");
-
-    // 1. Reset your own room
-    await db.collection("rooms").doc(roomId).update({
-        status: "idle",
-        requestConnect: false
-    });
-
-    // 2. Reset your partner's room if possible
-    if (partnerRoomId) {
-        await db.collection("rooms").doc(partnerRoomId).update({
-            status: "idle",
-            requestConnect: false
-        });
-        partnerRoomId = null;
-    }
-
-    // 3. UI Cleanup
+    await db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
+    if (partnerRoomId) await db.collection("rooms").doc(partnerRoomId).update({ status: "idle", requestConnect: false });
+    partnerRoomId = null;
     closeBottomBar();
     finishLoading();
-    speak("Disconnected. Time for a break!");
 };
 
-
-// --- 6. TUTOR/BUDDY SEND COMMANDS ---
 window.requestConnectionUI = async (val) => {
     const friendCode = val.trim();
-    if (!friendCode || friendCode.length !== 4) {
-        speak("Need 4 digits!");
-        return;
-    }
+    if (friendCode.length !== 4) return;
     partnerRoomId = "hack-" + friendCode;
-    updateStatus("Connecting...");
-    await db.collection("rooms").doc(partnerRoomId).set({
-        requestConnect: true,
-        requesterCode: roomId.replace('hack-', '')
-    }, { merge: true });
-    speak("Request sent!");
+    await db.collection("rooms").doc(partnerRoomId).set({ requestConnect: true, requesterCode: roomId.replace('hack-', '') }, { merge: true });
     closeBottomBar();
-};
-
-window.sendCommandToBuddy = async (type, payload = {}) => {
-    if (!partnerRoomId) {
-        speak("Connect to a buddy first!");
-        return;
-    }
-    await db.collection("rooms").doc(partnerRoomId).set({
-        command: { type, ...payload, timestamp: Date.now() }
-    }, { merge: true });
 };
 
 window.sendMessageUI = async (msg) => {
-    if (!partnerRoomId) {
-        speak("Connect first!");
-        return;
-    }
-    if (!msg) return;
-    await db.collection("rooms").doc(partnerRoomId).set({
-        lastMessage: msg,
-        lastMessageTimestamp: Date.now(),
-        status: "connected"
-    }, { merge: true });
+    if (!partnerRoomId || !msg) return;
+    await db.collection("rooms").doc(partnerRoomId).set({ lastMessage: msg, lastMessageTimestamp: Date.now(), status: "connected" }, { merge: true });
     closeBottomBar();
 };
 
 // --- RADIAL MENU RENDERING ENGINE ---
-const RADIAL_RADIUS = 130; // Push further out from buddy
-
+const RADIAL_RADIUS = 130;
 const radialMenuData = {
     main: [
         { angle: 45, icon: '🖌️', action: () => openRadialMenu('customize'), color: '' },
@@ -400,32 +302,44 @@ const radialMenuData = {
         { angle: -135, icon: '❌', action: () => closeRadialMenu(), color: 'btn-close' }
     ],
     customize: [
-        { angle: 45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
         { angle: -45, icon: '🎨', action: () => openRadialMenu('colors'), color: '' },
-        { angle: 135, icon: '🎩', action: () => openRadialMenu('hats'), color: '' }
+        { angle: 135, icon: '🎩', action: () => openRadialMenu('hats'), color: '' },
+        { angle: -135, icon: '🔶', action: () => openRadialMenu('shapes'), color: '' }
     ],
     colors: [
-        { angle: -45, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: -45, icon: '↩️', action: () => openRadialMenu('customize'), color: 'btn-back' },
         { angle: 45, icon: '🔴', action: () => { applyColor('#d63031', '#ff7675'); closeRadialMenu(); }, color: 'btn-fire' },
         { angle: 135, icon: '🟢', action: () => { applyColor('#00b894', '#55efc4'); closeRadialMenu(); }, color: 'btn-mint' },
         { angle: -135, icon: '🔵', action: () => { applyColor('#0984e3', '#74b9ff'); closeRadialMenu(); }, color: 'btn-sky' },
-        { angle: 0, icon: '🟣', action: () => { applyColor('#6c5ce7', '#a29bfe'); closeRadialMenu(); }, color: '' },
+        { angle: 0, icon: '🟣', action: () => { applyColor('#6c5ce7', '#a29bfe'); closeRadialMenu(); }, color: 'btn-purple' },
+        { angle: 90, icon: '🟡', action: () => { applyColor('#fdcb6e', '#ffeaa7'); closeRadialMenu(); }, color: 'btn-yellow' },
+        { angle: 180, icon: '💖', action: () => { applyColor('#fd79a8', '#ff9ff3'); closeRadialMenu(); }, color: 'btn-pink' },
+        { angle: -90, icon: '⚪', action: () => { applyColor('#ffffff', '#dfe6e9'); closeRadialMenu(); }, color: 'btn-white' }
     ],
     hats: [
-        { angle: 135, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: 135, icon: '↩️', action: () => openRadialMenu('customize'), color: 'btn-back' },
         { angle: -45, icon: '🎩', action: () => { applyHat('🎩'); closeRadialMenu(); }, color: 'btn-fire' },
         { angle: 45, icon: '👑', action: () => { applyHat('👑'); closeRadialMenu(); }, color: 'btn-sky' },
-        { angle: -135, icon: '🚫', action: () => { applyHat('none'); closeRadialMenu(); }, color: 'btn-close' }
+        { angle: 0, icon: '🎓', action: () => { applyHat('🎓'); closeRadialMenu(); }, color: 'btn-mint' },
+        { angle: 90, icon: '🤠', action: () => { applyHat('cowboy'); closeRadialMenu(); }, color: 'btn-yellow' },
+        { angle: -135, icon: '🚫', action: () => { applyHat('none'); closeRadialMenu(); }, color: '' }
+    ],
+    shapes: [
+        { angle: -135, icon: '↩️', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: -45, icon: '🔺', action: () => { applyShape('triangle'); closeRadialMenu(); }, color: '' },
+        { angle: 45, icon: '🔵', action: () => { applyShape('circle'); closeRadialMenu(); }, color: '' },
+        { angle: 135, icon: '⬛', action: () => { applyShape('square'); closeRadialMenu(); }, color: '' },
+        { angle: 0, icon: '🟦', action: () => { applyShape('default'); closeRadialMenu(); }, color: '' } 
     ],
     network: [
-        { angle: -45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: -45, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
         { angle: 45, icon: '🔓', action: () => openBottomBar('connect'), color: '' },
-        { angle: 135, icon: '💬', action: () => openBottomBar('message'), color: '' },
-        { angle: -135, icon: '👋', action: () => { window.sendCommandToBuddy('wiggle'); closeRadialMenu(); }, color: '' }
+        { angle: 135, icon: '💬', action: () => openBottomBar('message'), color: '' }
     ],
     settings: [
-        { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
-        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' },
+        { angle: 135, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '🏷️', action: () => { nameInputContainer.style.display = 'block'; closeRadialMenu(); }, color: '' },
         { angle: -45, icon: '🗣️', action: () => { window.toggleVoicePreference(); closeRadialMenu(); }, color: 'btn-sky' },
         { angle: 0, icon: '🔊', action: () => openBottomBar('volume'), color: 'btn-mint' }
     ]
@@ -433,38 +347,25 @@ const radialMenuData = {
 
 window.openRadialMenu = (viewId) => {
     closeBottomBar();
-    radialContainer.innerHTML = ''; // Clear prev
+    radialContainer.innerHTML = '';
     const nodes = radialMenuData[viewId];
     if (!nodes) return;
-
     nodes.forEach((node, index) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'radial-btn-wrapper';
-
-        // Use standard Rotate/Translate to map angle easily using CSS
-        // Ensure negative numbers don't print double-minuses
         wrapper.style.transform = `rotate(${node.angle}deg) translateY(-${RADIAL_RADIUS}px) rotate(${-node.angle}deg)`;
-
         const btn = document.createElement('button');
         btn.className = `radial-btn ${node.color}`;
         btn.innerText = node.icon;
         btn.onclick = node.action;
-
         wrapper.appendChild(btn);
         radialContainer.appendChild(wrapper);
-
-        // trigger animation after a tiny delay so it pops out
-        setTimeout(() => {
-            wrapper.classList.add('active');
-        }, 10 + index * 50); // Stagger pop-out
+        setTimeout(() => wrapper.classList.add('active'), 10 + index * 50);
     });
 };
 
-window.closeRadialMenu = () => {
-    radialContainer.innerHTML = '';
-};
+window.closeRadialMenu = () => { radialContainer.innerHTML = ''; };
 
-// --- DYNAMIC BOTTOM BAR FORMS ---
 window.openBottomBar = (mode) => {
     closeRadialMenu();
     const input = document.getElementById('dynamic-input');
@@ -484,18 +385,10 @@ window.openBottomBar = (mode) => {
 
     if (mode === 'connect') {
         input.placeholder = 'Partner Code (4 Digits)';
-        input.maxLength = 4;
-        btn.innerText = 'LINK';
-        btn.onclick = () => window.requestConnectionUI(input.value);
-        if (window.isPartnerConnected) {
-            statusDot.style.display = 'inline-block';
-            statusDot.classList.add('connected');
-            btn.innerText = 'DISCONNECT';
-            btn.onclick = () => window.disconnectBuddy();
-        }
+        btn.innerText = window.isPartnerConnected ? 'DISCONNECT' : 'LINK';
+        btn.onclick = () => window.isPartnerConnected ? window.disconnectBuddy() : window.requestConnectionUI(input.value);
     } else if (mode === 'message') {
         input.placeholder = 'Type a message...';
-        input.removeAttribute('maxLength');
         btn.innerText = 'SEND';
         btn.onclick = () => window.sendMessageUI(input.value);
     } else if (mode === 'volume') {
@@ -511,58 +404,63 @@ window.openBottomBar = (mode) => {
              speak(`Volume: ${Math.round(voiceVolume * 100)}%`);
              closeBottomBar();
         };
-        // Live feedback
-        slider.oninput = () => {
-             voiceVolume = parseFloat(slider.value);
-        };
+        slider.oninput = () => { voiceVolume = parseFloat(slider.value); };
     }
     input.onkeypress = (e) => { if (e.key === 'Enter') btn.click(); };
     if (mode !== 'volume') setTimeout(() => input.focus(), 150);
 };
 
-window.closeBottomBar = () => {
-    bottomBar.classList.remove('visible');
-};
+window.closeBottomBar = () => { bottomBar.classList.remove('visible'); };
 
 // --- Customizations ---
 window.applyColor = (c1, c2) => {
-    if (buddy) buddy.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+    document.documentElement.style.setProperty('--buddy-c1', c1);
+    document.documentElement.style.setProperty('--buddy-c2', c2);
+    localStorage.setItem('buddy-color', JSON.stringify({ c1, c2 }));
 };
 
 window.applyHat = (hatStr) => {
-    const hatOverlay = document.getElementById('hat-overlay');
-    if (hatOverlay) {
+    const emojiSpan = document.getElementById('emoji-hat-span');
+    const cssCowboyHat = document.getElementById('css-cowboy-hat');
+    
+    if (emojiSpan && cssCowboyHat) {
+        emojiSpan.innerText = '';
+        cssCowboyHat.style.display = 'none';
+
         if (hatStr === 'none') {
-            hatOverlay.innerText = '';
+            // Stay empty
+        } else if (hatStr === 'cowboy') {
+            cssCowboyHat.style.display = 'block';
         } else {
-            hatOverlay.innerText = hatStr;
+            emojiSpan.innerText = hatStr;
         }
     }
+    localStorage.setItem('buddy-hat', hatStr);
+};
+
+window.applyShape = (shape) => {
+    if (!buddy) return;
+    buddy.classList.remove('shape-circle', 'shape-square', 'shape-triangle');
+    if (shape !== 'default') buddy.classList.add(`shape-${shape}`);
+    localStorage.setItem('buddy-shape', shape);
 };
 
 // --- 6. DISTRACTION WATCHDOG LISTENER ---
 let lastWarningSpeakTime = 0;
 let distractionHeartbeat;
 
-ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
+ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground) => {
     if (isDistracted) {
         if (buddy) {
-            // Priority: Angry if in foreground, Suspicious if in background
             if (isForeground) {
                 if (!buddy.classList.contains('angry')) {
-                    speakVerbal("Hey!"); // Initial exclamation
+                    speakVerbal("Hey!"); 
                 }
                 buddy.classList.remove('suspicious');
                 buddy.classList.add('angry');
             } else {
                 buddy.classList.remove('angry');
                 buddy.classList.add('suspicious');
-            }
-
-            // Auto-flip back if something bad is happenning
-            const container = document.getElementById('buddy-container');
-            if (container && container.classList.contains('flipped')) {
-                window.toggleControlPanel();
             }
         }
 
@@ -571,18 +469,14 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
             if (buddy) buddy.classList.remove('angry');
         }, 4000);
     } else {
-        // Cool down if the main process specifically says we are not distracted
         if (buddy) buddy.classList.remove('angry');
     }
 });
 
 ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => {
-    console.log(`Watchdog: Caught user looking at ${appName} (Foreground: ${isForeground})`);
-
     const now = Date.now();
     if (now - lastWarningSpeakTime > 30000) {
         let warnings = [];
-
         if (isForeground) {
             warnings = [
                 `Hey! Get off ${appName} and get back to work!`,
@@ -597,17 +491,21 @@ ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => 
                 `I smell ${appName} in the background. Don't think I can't see it!`
             ];
         }
-
         const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
         speak(randomWarning, 4000);
         lastWarningSpeakTime = now;
     }
 });
 
-
 // --- STARTUP ---
 document.addEventListener('DOMContentLoaded', () => {
     initTTS();
+    const buddyColor = JSON.parse(localStorage.getItem('buddy-color')) || { c1: '#6c5ce7', c2: '#a29bfe' };
+    const buddyHat = localStorage.getItem('buddy-hat') || 'none';
+    const buddyShape = localStorage.getItem('buddy-shape') || 'default';
+    window.applyColor(buddyColor.c1, buddyColor.c2);
+    window.applyHat(buddyHat);
+    window.applyShape(buddyShape);
     speak("Hello! Just waking up...");
-    initFirebase();
+    setTimeout(initFirebase, 2000);
 });
