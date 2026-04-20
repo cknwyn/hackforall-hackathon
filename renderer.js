@@ -85,6 +85,7 @@ window.addEventListener('pointerup', (e) => {
             buddy.releasePointerCapture(e.pointerId);
         }
 
+
         // If they didn't really move the mouse, treat as a click to open menu
         if (!dragMoved) {
             window.openRadialMenu('main');
@@ -448,7 +449,7 @@ window.applyHat = (hatStr) => {
 let lastWarningSpeakTime = 0;
 let distractionHeartbeat;
 
-ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground) => {
+ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
     if (isDistracted) {
         if (buddy) {
             // Priority: Angry if in foreground, Suspicious if in background
@@ -469,16 +470,11 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground)
 
         clearTimeout(distractionHeartbeat);
         distractionHeartbeat = setTimeout(() => {
-            if (buddy) {
-                buddy.classList.remove('angry');
-                buddy.classList.remove('suspicious');
-            }
+            if (buddy) buddy.classList.remove('angry');
         }, 4000);
     } else {
-        if (buddy) {
-            buddy.classList.remove('angry');
-            buddy.classList.remove('suspicious');
-        }
+        // Cool down if the main process specifically says we are not distracted
+        if (buddy) buddy.classList.remove('angry');
     }
 });
 

@@ -61,15 +61,6 @@
             background: linear-gradient(135deg, #ff4757, #ff6b81) !important;
         }
 
-        .buddy.suspicious {
-            box-shadow: 0 0 30px #fdcb6e !important;
-            background: linear-gradient(135deg, #e17055, #fab1a0) !important;
-        }
-
-        .buddy.suspicious .eye {
-            transform: scaleY(0.2); /* Squinting */
-        }
-
         .buddy::before {
             /* Head antenna */
             content: '';
@@ -329,7 +320,7 @@
             pointer-events: none;
             /* Will be translated using JS: transform: rotate(Xdeg) translateY(-100px) rotate(-Xdeg) */
         }
-        
+
         .radial-btn-wrapper.active {
             opacity: 1;
             pointer-events: auto;
@@ -350,7 +341,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             transition: transform 0.2s, background 0.2s;
         }
 
@@ -359,11 +350,25 @@
             background: #a29bfe;
         }
 
-        .btn-fire { background: #d63031; }
-        .btn-mint { background: #00b894; }
-        .btn-sky { background: #0984e3; }
-        .btn-back { background: #2d3436; }
-        .btn-close { background: #ff7675; }
+        .btn-fire {
+            background: #d63031;
+        }
+
+        .btn-mint {
+            background: #00b894;
+        }
+
+        .btn-sky {
+            background: #0984e3;
+        }
+
+        .btn-back {
+            background: #2d3436;
+        }
+
+        .btn-close {
+            background: #ff7675;
+        }
 
         /* Hats Overlay Layer */
         .hat-layer {
@@ -387,13 +392,13 @@
             padding: 10px 15px;
             display: flex;
             gap: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             z-index: 500;
             transform: translateY(150%);
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             align-items: center;
         }
-        
+
         #bottom-input-bar.visible {
             transform: translateY(0);
         }
@@ -421,7 +426,10 @@
             font-weight: bold;
             transition: background 0.2s;
         }
-        .bar-btn:hover { background: #5849c4; }
+
+        .bar-btn:hover {
+            background: #5849c4;
+        }
 
         #control-panel.visible {
             transform: translateY(0);
