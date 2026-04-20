@@ -10,67 +10,37 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            height: 100vh;
             margin: 0;
-            padding: 20px;
         }
         .container {
             background: white;
             padding: 30px;
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            width: 500px;
+            width: 400px;
             text-align: center;
         }
-        h1 { color: #6c5ce7; margin-bottom: 5px; }
-        .subtitle { color: #636e72; margin-bottom: 25px; font-size: 14px; }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        .status-idle { background: #dfe6e9; color: #636e72; }
-        .status-requesting { background: #ffeaa7; color: #d6a217; }
-        .status-connected { background: #55efc4; color: #00b894; }
-
+        h1 { color: #6c5ce7; margin-bottom: 25px; }
         input {
-            width: 100%;
+            width: 80%;
             padding: 12px;
             border: 2px solid #ddd;
             border-radius: 10px;
             margin-bottom: 15px;
             font-size: 16px;
-            box-sizing: border-box;
-        }
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 20px;
         }
         button {
             background: #6c5ce7;
             color: white;
             border: none;
-            padding: 12px;
+            padding: 12px 25px;
             border-radius: 10px;
-            font-size: 14px;
+            font-size: 16px;
             cursor: pointer;
-            transition: background 0.3s, transform 0.1s;
+            transition: background 0.3s;
         }
         button:hover { background: #a29bfe; }
-        button:active { transform: scale(0.95); }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-
-        .btn-connect { width: 100%; background: #00b894; margin-bottom: 15px; }
-        .btn-move { background: #0984e3; }
-        .btn-wiggle { background: #e17055; }
-        .btn-emoji { background: #fdcb6e; color: #2d3436; }
-
         .hint {
             margin-top: 20px;
             font-size: 12px;
@@ -81,130 +51,28 @@
 <body>
     <div class="container">
         <h1>Tutor Control</h1>
-        <div class="subtitle">Enter Buddy Code to Connect</div>
-        
-        <input type="text" id="roomCodeInput" placeholder="Enter 4-digit code (e.g. 1234)" style="text-align: center; font-size: 20px; letter-spacing: 5px;">
-        
-        <div id="status-badge" class="status-badge status-idle">Ready to Connect</div>
-
-        <button id="connectBtn" class="btn btn-connect" onclick="requestConnection()">Connect to Buddy</button>
-
-        <div id="control-panel" style="opacity: 0.5; pointer-events: none;">
-            <p>Send a message to the Buddy:</p>
-            <input type="text" id="msgInput" placeholder="Type something helpful..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button style="width: 100%;" onclick="sendMessage()">Send Message</button>
-
-            <div class="controls">
-                <button class="btn-move" onclick="sendCommand('move', {x: 0, y: -50})">Move Up</button>
-                <button class="btn-move" onclick="sendCommand('move', {x: 0, y: 50})">Move Down</button>
-                <button class="btn-move" onclick="sendCommand('move', {x: -50, y: 0})">Move Left</button>
-                <button class="btn-move" onclick="sendCommand('move', {x: 50, y: 0})">Move Right</button>
-                <button class="btn-wiggle" onclick="sendCommand('wiggle')">Wiggle Buddy</button>
-                <button class="btn-emoji" onclick="sendCommand('emoji', {value: '🌟 Awesome job!'})">Send Star</button>
-                <button class="btn-emoji" onclick="sendCommand('emoji', {value: '💡 Let me help you with this.'})">Send Help</button>
-                <button class="btn-emoji" onclick="sendCommand('emoji', {value: '👋 Hi there!'})">Wave</button>
-            </div>
-        </div>
+        <p>Send a message to the Buddy:</p>
+        <input type="text" id="msgInput" placeholder="Type something helpful...">
+        <br>
+        <button onclick="sendMessage()">Send to Buddy</button>
 
         <div class="hint">
-            <p>Wait for the student to "Accept" before you can send commands.</p>
+            <p>Note: This requires the Firebase config to be set up in both the app and this dashboard to work live.</p>
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
-          authDomain: "YOUR_AUTH_DOMAIN",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_STORAGE_BUCKET",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID",
-          measurementId: "YOUR_MEASUREMENT_ID"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        let roomRef;
-        let unsubscribe = null;
-
-        function connectToRoom(code) {
-            if (unsubscribe) unsubscribe();
-            
-            const roomId = "hack-" + code;
-            roomRef = doc(db, "rooms", roomId);
-
-            // Listen for changes
-            unsubscribe = onSnapshot(roomRef, (snapshot) => {
-                if (!snapshot.exists()) {
-                    // Initialize room if it doesn't exist
-                    setDoc(roomRef, { status: "idle", requestConnect: false });
-                    return;
-                }
-                const data = snapshot.data();
-                updateUI(data);
-            });
-        }
-
-        function updateUI(data) {
-            const badge = document.getElementById('status-badge');
-            const panel = document.getElementById('control-panel');
-            const connectBtn = document.getElementById('connectBtn');
-
-            if (data.status === "connected") {
-                badge.innerText = "Connected";
-                badge.className = "status-badge status-connected";
-                panel.style.opacity = "1";
-                panel.style.pointer_events = "auto";
-                connectBtn.disabled = true;
-                connectBtn.innerText = "Tutor Session Live";
-            } else if (data.requestConnect) {
-                badge.innerText = "Awaiting Acceptance...";
-                badge.className = "status-badge status-requesting";
-                connectBtn.disabled = true;
-            } else {
-                badge.innerText = "Ready to Connect";
-                badge.className = "status-badge status-idle";
-                panel.style.opacity = "0.5";
-                panel.style.pointer_events = "none";
-                connectBtn.disabled = false;
-                connectBtn.innerText = "Connect to Student";
-            }
-        }
-
-        window.requestConnection = async () => {
-            const code = document.getElementById('roomCodeInput').value.trim();
-            if (!code || code.length !== 4) {
-                alert("Please enter a valid 4-digit Buddy Code first!");
-                return;
-            }
-            
-            connectToRoom(code);
-
-            await setDoc(roomRef, { 
-                requestConnect: true,
-                status: "requesting" 
-            }, { merge: true });
-        };
-
-        window.sendMessage = async () => {
+    <script>
+        function sendMessage() {
             const msg = document.getElementById('msgInput').value;
             if (!msg) return;
-            await setDoc(roomRef, { 
-                lastMessage: msg,
-                lastMessageTimestamp: Date.now()
-            }, { merge: true });
-            document.getElementById('msgInput').value = '';
-        };
 
-        window.sendCommand = async (type, payload = {}) => {
-            await setDoc(roomRef, { 
-                command: { type, ...payload, timestamp: Date.now() }
-            }, { merge: true });
-        };
+            console.log("Sending:", msg);
+            // In a real implementation, this would update Firebase:
+            // db.collection("rooms").doc("hackathon-room-001").update({ lastMessage: msg });
+            
+            alert("In a full build, this message would appear on the student's screen via Firebase!");
+            document.getElementById('msgInput').value = '';
+        }
     </script>
 </body>
 </html>

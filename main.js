@@ -6,10 +6,10 @@ function createWindow() {
   const { width, height } = primaryDisplay.workAreaSize;
 
   const win = new BrowserWindow({
-    width: 300,
-    height: 300,
-    x: width - 350, // Bottom right corner
-    y: height - 350,
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -18,15 +18,17 @@ function createWindow() {
     skipTaskbar: false,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false, // For simplicity in hackathon project
+      contextIsolation: false,
     },
   });
 
+  // Set to highest level on Windows/Mac to stay above taskbar/other apps
+  win.setAlwaysOnTop(true, 'screen-saver');
+
   win.loadFile('index.html');
 
-  // Ignore mouse events initially to allow click-through
-  // but we can toggle this if we want to interact with the buddy
-  // win.setIgnoreMouseEvents(true, { forward: true });
+  // Initially ignore all mouse events for the full-screen window
+  win.setIgnoreMouseEvents(true, { forward: true });
 
   // IPC listener to toggle mouse events from the renderer
   ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
@@ -34,11 +36,19 @@ function createWindow() {
     win.setIgnoreMouseEvents(ignore, options);
   });
 
-  // IPC listener to move the window
-  ipcMain.on('move-window', (event, x, y) => {
+  // IPC listener to minimize the app
+  ipcMain.on('minimize-app', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    const [currentX, currentY] = win.getPosition();
-    win.setPosition(Math.round(currentX + x), Math.round(currentY + y));
+    if (win) win.minimize();
+  });
+
+  // IPC listener to drag the window
+  ipcMain.on('drag-window', (event, { x, y }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      const [currX, currY] = win.getPosition();
+      win.setPosition(currX + x, currY + y);
+    }
   });
 }
 

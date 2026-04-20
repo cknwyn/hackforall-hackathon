@@ -1,32 +1,113 @@
 const { ipcRenderer } = require('electron');
 
-// --- 1. CORE UI ELEMENTS ---
+// --- FIREBASE CONFIGURATION ---
+// PASTE YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// --- APP LOGIC ---
+
 const bubble = document.getElementById('buddy-bubble');
 const text = document.getElementById('buddy-text');
 const mouth = document.getElementById('buddy-mouth');
 const buddy = document.getElementById('main-buddy');
-const overlay = document.getElementById('connect-overlay');
-const idBadge = document.getElementById('id-badge');
-const nameInputContainer = document.getElementById('name-input-container');
-const nameInput = document.getElementById('buddy-name-input');
-const controlPanel = document.getElementById('control-panel');
-const partnerCodeInput = document.getElementById('partner-code-input');
-const connectBtn = document.getElementById('connect-btn');
-const buddyMsgInput = document.getElementById('buddy-msg-input');
-const partnerStatus = document.getElementById('partner-status');
-const connectRequestText = document.getElementById('connect-request-text');
+const circularMenu = document.getElementById('circular-menu');
+const btnPower = document.getElementById('btn-power');
+const btnMinimize = document.getElementById('btn-minimize');
 
-// --- 2. GLOBAL STATE ---
-let db = null;
-let partnerRoomId = null;
-let requesterCode = null;
-let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
-const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
+// Independent Dragging Logic
+let totalMovement = 0;
 
-// --- 3. BASIC BUDDY FUNCTIONS (ALWAYS WORK) ---
+function makeDraggable(el, dragHandle = el) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    
+    dragHandle.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        if (e.target.closest('button, input, .color-option')) return;
+
+        e = e || window.event;
+        e.preventDefault();
+        
+        const rect = el.getBoundingClientRect();
+        el.style.top = rect.top + "px";
+        el.style.left = rect.left + "px";
+        el.style.bottom = 'auto';
+        el.style.right = 'auto';
+        el.style.margin = '0';
+
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+        
+        if (el === buddyScaler || el === buddy) {
+            totalMovement = 0;
+        }
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        
+        el.style.top = (el.offsetTop - pos2) + "px";
+        el.style.left = (el.offsetLeft - pos1) + "px";
+        
+        el.style.transform = el.style.transform.replace(/translate\(-50%, -50%\)/g, 'translate(0, 0)');
+        if (el.classList.contains('buddy-scaler')) {
+             el.style.transform = `scale(var(--buddy-scale))`;
+        }
+
+        totalMovement += Math.abs(pos1) + Math.abs(pos2);
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}
+
+const buddyScaler = document.querySelector('.buddy-scaler');
+const settingsMenu = document.getElementById('settings-menu');
+const warningOverlay = document.getElementById('warning-overlay');
+const warningBox = document.querySelector('.warning-box');
+
+makeDraggable(buddyScaler, buddy);
+makeDraggable(bubble);
+makeDraggable(settingsMenu);
+makeDraggable(circularMenu);
+
+// Toggle menu on buddy click
+buddy.addEventListener('click', (e) => {
+    if (totalMovement < 10) {
+        circularMenu.classList.toggle('active');
+    }
+});
+
+// Close app on power button click
+btnPower.addEventListener('click', () => {
+    window.close();
+});
+
+// Minimize app on minimize button click
+if (btnMinimize) {
+    btnMinimize.addEventListener('click', () => {
+        ipcRenderer.send('minimize-app');
+    });
+}
+
+// Function to make buddy speak
 function speak(message, duration = 3000) {
-    console.log("Buddy says:", message);
-    if (!text || !bubble || !mouth) return;
     text.innerText = message;
     bubble.classList.add('visible');
     mouth.style.height = '10px';
@@ -39,298 +120,161 @@ function speak(message, duration = 3000) {
     }, duration);
 }
 
-function updateStatus(status) {
-    if (idBadge) {
-        idBadge.innerText = status;
-        idBadge.style.color = '#e17055'; // Orange-ish while loading
-    }
+// Function to move buddy (relative to its container or window)
+function moveWindow(x, y) {
+    buddy.style.transform = `translate(${x}px, ${y}px)`;
 }
 
-function finishLoading() {
-    if (idBadge) {
-        idBadge.innerText = `${buddyName} | Code: ${roomId.replace('hack-', '')}`;
-        idBadge.style.color = '#6c5ce7'; // Purple when ready
+// Initial Greeting
+setTimeout(() => {
+    speak("Hello! I'm ready to help you learn!");
+}, 1000);
+
+// --- FIREBASE INITIALIZATION ---
+try {
+    const firebase = require('firebase/app');
+    require('firebase/firestore');
+
+    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const roomId = "hackathon-room-001"; 
+        
+        db.collection("rooms").doc(roomId).onSnapshot((doc) => {
+            const data = doc.data();
+            if (data && data.lastMessage) {
+                speak(data.lastMessage);
+            }
+        });
     }
+} catch (e) {
+    console.error("Firebase error:", e.message);
 }
 
-// --- 4. INTERACTION LOGIC (DRAGGING) ---
-let isDragging = false;
-let mouseX, mouseY;
+const btnSettings = document.getElementById('btn-settings');
+const btnCloseX = document.getElementById('btn-close-x');
+const scaleSlider = document.getElementById('scale-slider');
+const colorOptions = document.querySelectorAll('.color-option');
+const btnSave = document.getElementById('btn-save');
+const btnCancel = document.getElementById('btn-cancel');
+const btnWarningCancel = document.getElementById('btn-warning-cancel');
+const btnWarningClose = document.getElementById('btn-warning-close');
 
-if (buddy) {
-    buddy.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-        ipcRenderer.send('set-ignore-mouse-events', false);
-    });
+let savedSettings = { scale: 1, color: '#6c5ce7' };
+let currentSettings = { scale: 1, color: '#6c5ce7' };
 
-    // Double click to toggle menu
-    buddy.addEventListener('dblclick', () => {
-        controlPanel.classList.toggle('visible');
-        if (controlPanel.classList.contains('visible')) {
-            speak("How can I help?");
-        }
-    });
+function updateBuddyUI(settings) {
+    document.body.style.setProperty('--buddy-color', settings.color);
+    document.body.style.setProperty('--buddy-scale', settings.scale);
 }
 
-window.addEventListener('mouseup', () => isDragging = false);
-window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        ipcRenderer.send('move-window', e.clientX - mouseX, e.clientY - mouseY);
-        return;
-    }
-
-    // Check if mouse is over UI elements
-    const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overPanel = controlPanel && (document.elementFromPoint(e.clientX, e.clientY) === controlPanel || controlPanel.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const isOverlayVisible = overlay && overlay.classList.contains('visible');
-
-    if (!overBuddy && !overBubble && !overBadge && !overPanel && !isOverlayVisible) {
-        ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+function checkChanges() {
+    const hasChanges = currentSettings.scale != savedSettings.scale || currentSettings.color != savedSettings.color;
+    if (hasChanges) {
+        btnSave.classList.remove('disabled');
+        btnCancel.classList.remove('disabled');
     } else {
-        ipcRenderer.send('set-ignore-mouse-events', false);
+        btnSave.classList.add('disabled');
+        btnCancel.classList.add('disabled');
+    }
+    return hasChanges;
+}
+
+btnSettings.addEventListener('click', () => {
+    currentSettings = { ...savedSettings };
+    scaleSlider.value = currentSettings.scale;
+    colorOptions.forEach(opt => {
+        if (opt.dataset.color === currentSettings.color) opt.classList.add('selected');
+        else opt.classList.remove('selected');
+    });
+    updateBuddyUI(currentSettings);
+    
+    // Position settings menu above the buddy
+    const buddyRect = buddy.getBoundingClientRect();
+    settingsMenu.style.display = 'flex'; // Temporarily show to get dimensions
+    const menuRect = settingsMenu.getBoundingClientRect();
+    
+    settingsMenu.style.left = (buddyRect.left + buddyRect.width / 2 - menuRect.width / 2) + "px";
+    settingsMenu.style.top = (buddyRect.top - menuRect.height - 30) + "px";
+    settingsMenu.style.bottom = 'auto';
+    settingsMenu.style.right = 'auto';
+    settingsMenu.style.margin = '0';
+    
+    settingsMenu.classList.add('active');
+    circularMenu.classList.remove('active');
+    checkChanges();
+});
+
+scaleSlider.addEventListener('input', (e) => {
+    currentSettings.scale = e.target.value;
+    updateBuddyUI(currentSettings);
+    checkChanges();
+});
+
+colorOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+        colorOptions.forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        currentSettings.color = opt.dataset.color;
+        updateBuddyUI(currentSettings);
+        checkChanges();
+    });
+});
+
+btnSave.addEventListener('click', () => {
+    if (btnSave.classList.contains('disabled')) return;
+    savedSettings = { ...currentSettings };
+    settingsMenu.classList.remove('active');
+});
+
+btnCancel.addEventListener('click', () => {
+    if (btnCancel.classList.contains('disabled')) return;
+    currentSettings = { ...savedSettings };
+    updateBuddyUI(currentSettings);
+    settingsMenu.classList.remove('active');
+});
+
+btnCloseX.addEventListener('click', () => {
+    if (checkChanges()) {
+        warningOverlay.style.display = 'flex';
+    } else {
+        settingsMenu.classList.remove('active');
     }
 });
 
-// Wander Mode
-setInterval(() => {
-    if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
-    ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
-}, 10000);
+btnWarningCancel.addEventListener('click', () => {
+    warningOverlay.style.display = 'none';
+});
 
-// --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
-async function initFirebase() {
-    updateStatus("Loading Bridge...");
+btnWarningClose.addEventListener('click', () => {
+    currentSettings = { ...savedSettings };
+    updateBuddyUI(currentSettings);
+    warningOverlay.style.display = 'none';
+    settingsMenu.classList.remove('active');
+});
 
-    try {
-        // Use global 'firebase' from the CDN script
-        if (typeof firebase === 'undefined') {
-            throw new Error("Firebase CDN scripts failed to load.");
-        }
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
-            authDomain: "hackforall-hackathon.firebaseapp.com",
-            projectId: "hackforall-hackathon",
-            storageBucket: "hackforall-hackathon.firebasestorage.app",
-            messagingSenderId: "391540276748",
-            appId: "1:391540276748:web:8dd22d1a98684e8b647829",
-            measurementId: "G-L2N5PZC4R5"
-        };
-
-        updateStatus("Connecting DB...");
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-
-        updateStatus("Ready!");
-
-        // Quality of Life: Initialize room explicitly and wait for it
-        await db.collection("rooms").doc(roomId).set({ status: "idle", requestConnect: false });
-        finishLoading();
-
-        setupTutorListener();
-        speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
-
-    } catch (err) {
-        console.error("Firebase Init Error:", err);
-        updateStatus("Offline Mode");
-        // Speak the error for debugging
-        const errMsg = err.message || "Unknown error";
-        speak(`Error: ${errMsg.substring(0, 40)}`);
-        setTimeout(finishLoading, 6000);
+// Handle mouse transparency
+let lastInteractiveTime = 0;
+window.addEventListener('mousemove', (e) => {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    
+    // Check if the element or any of its parents are interactive
+    // For circular menu, only consider it interactive if the element under mouse is visible
+    const isOverCircularMenu = el && el.closest('#circular-menu') && window.getComputedStyle(el).opacity !== '0';
+    const isOverOtherInteractive = el && el.closest('#main-buddy, #buddy-bubble, #settings-menu, .warning-box');
+    
+    if (isOverCircularMenu || isOverOtherInteractive) {
+        lastInteractiveTime = Date.now();
+        ipcRenderer.send('set-ignore-mouse-events', false);
+    } else if (Date.now() - lastInteractiveTime > 150) {
+        // Only set to ignore if we haven't been over an interactive element for 150ms
+        ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     }
-}
+});
 
-function setupTutorListener() {
-    if (!db) return;
-    db.collection("rooms").doc(roomId).onSnapshot((doc) => {
-        // Blink on data receipt
-        if (buddy) {
-            buddy.style.boxShadow = '0 0 30px #a29bfe';
-            setTimeout(() => buddy.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)', 200);
-        }
-
-        const data = doc.data();
-        if (!data) return;
-
-        // 1. Connection Request Logic
-        if (data.requestConnect && data.status !== "connected") {
-            requesterCode = data.requesterCode;
-            connectRequestText.innerText = `Buddy ${requesterCode} wants to connect!`;
-            overlay.classList.add('visible');
-        } else if (data.status === "connected") {
-            overlay.classList.remove('visible');
-            partnerStatus.classList.add('connected');
-
-            // Integrate Disconnect into the button
-            connectBtn.innerText = "Disconnect";
-            connectBtn.disabled = false;
-            connectBtn.onclick = () => window.disconnectBuddy();
-            connectBtn.style.background = "#ff7675"; // Red for disconnect
-
-            // QoL: Update badge text and style
-            idBadge.innerText = "Connected 🟢";
-            idBadge.style.color = '#00b894';
-            idBadge.style.background = 'white';
-            idBadge.style.opacity = '1';
-
-            // QoL Tweak: Hide badge after 5 seconds for a cleaner look
-            if (!window.badgeHideTimeout) {
-                window.badgeHideTimeout = setTimeout(() => {
-                    idBadge.style.opacity = '0';
-                    idBadge.style.pointerEvents = 'none'; // Don't let it block clicks
-                }, 5000);
-            }
-
-            // If they connected to US, we should know their room ID to talk back
-            if (data.requesterCode && !partnerRoomId) {
-                partnerRoomId = "hack-" + data.requesterCode;
-                console.log("Partner room identified:", partnerRoomId);
-            }
-        } else if (data.status === "idle") {
-            // QoL: Reset everything if we go back to idle
-            overlay.classList.remove('visible');
-            partnerStatus.classList.remove('connected');
-            idBadge.style.display = 'block';
-            idBadge.style.opacity = '1';
-            idBadge.style.pointerEvents = 'auto';
-
-            // Reset button to Connect mode
-            connectBtn.innerText = "Connect";
-            connectBtn.disabled = false;
-            connectBtn.onclick = () => window.requestConnectionUI();
-            connectBtn.style.background = "#6c5ce7"; // Original purple
-
-            if (window.badgeHideTimeout) {
-                clearTimeout(window.badgeHideTimeout);
-                window.badgeHideTimeout = null;
-            }
-            finishLoading();
-        } else {
-            partnerStatus.classList.remove('connected');
-        }
-
-        // 2. Incoming Messages
-        if (data.status === "connected" && data.lastMessage && data.lastMessageTimestamp > (window.lastProcessedMsg || 0)) {
-            speak(data.lastMessage);
-            window.lastProcessedMsg = data.lastMessageTimestamp;
-        }
-
-        // 3. Remote Commands
-        if (data.status === "connected" && data.command) {
-            handleRemoteCommand(data.command);
-            db.collection("rooms").doc(roomId).update({ command: null });
-        }
-    });
-}
-
-
-function handleRemoteCommand(cmd) {
-    if (cmd.type === 'wiggle') {
-        buddy.style.animation = 'wiggle 0.5s ease infinite';
-        setTimeout(() => buddy.style.animation = 'float 3s ease-in-out infinite', 2000);
-    } else if (cmd.type === 'emoji') {
-        speak(cmd.value);
-    } else if (cmd.type === 'move') {
-        ipcRenderer.send('move-window', cmd.x, cmd.y);
+// Extra safety: ensure we're interactive on mousedown if we were recently over something
+window.addEventListener('mousedown', (e) => {
+    if (Date.now() - lastInteractiveTime < 500) {
+        ipcRenderer.send('set-ignore-mouse-events', false);
     }
-}
-
-window.acceptBuddyUI = () => {
-    if (!requesterCode) return;
-
-    partnerRoomId = "hack-" + requesterCode;
-    db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
-    overlay.classList.remove('visible');
-    speak("We're connected!");
-};
-
-window.rejectTutor = () => {
-    db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
-    overlay.classList.remove('visible');
-};
-
-window.disconnectBuddy = async () => {
-    speak("Disconnecting...");
-
-    // 1. Reset your own room
-    await db.collection("rooms").doc(roomId).update({
-        status: "idle",
-        requestConnect: false
-    });
-
-    // 2. Reset your partner's room if possible
-    if (partnerRoomId) {
-        await db.collection("rooms").doc(partnerRoomId).update({
-            status: "idle",
-            requestConnect: false
-        });
-        partnerRoomId = null;
-    }
-
-    // 3. UI Cleanup
-    controlPanel.classList.remove('visible');
-    finishLoading();
-    speak("Disconnected. Time for a break!");
-};
-
-
-// --- 6. TUTOR/BUDDY SEND COMMANDS ---
-window.requestConnectionUI = async () => {
-    const friendCode = partnerCodeInput.value.trim();
-    if (!friendCode || friendCode.length !== 4) {
-        speak("Need a 4-digit code!");
-        return;
-    }
-
-    partnerRoomId = "hack-" + friendCode;
-    updateStatus("Connecting...");
-
-    await db.collection("rooms").doc(partnerRoomId).set({
-        requestConnect: true,
-        requesterCode: roomId.replace('hack-', '') // Send our own code!
-    }, { merge: true });
-
-    speak("Request sent!");
-    connectBtn.innerText = "Awaiting...";
-    connectBtn.disabled = true;
-};
-
-window.sendCommandToBuddy = async (type, payload = {}) => {
-    if (!partnerRoomId) {
-        speak("Connect to a buddy first!");
-        return;
-    }
-
-    await db.collection("rooms").doc(partnerRoomId).set({
-        command: { type, ...payload, timestamp: Date.now() }
-    }, { merge: true });
-};
-
-window.sendMessageUI = async () => {
-    if (!partnerRoomId) {
-        speak("Connect first!");
-        return;
-    }
-
-    const msg = buddyMsgInput.value;
-    if (!msg) return;
-
-    await db.collection("rooms").doc(partnerRoomId).set({
-        lastMessage: msg,
-        lastMessageTimestamp: Date.now(),
-        status: "connected" // Ensure they stay connected
-    }, { merge: true });
-
-    buddyMsgInput.value = '';
-};
-
-
-// --- STARTUP ---
-document.addEventListener('DOMContentLoaded', () => {
-    speak("Hello! Just waking up...");
-    initFirebase();
 });
