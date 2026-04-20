@@ -32,6 +32,8 @@ let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
 let buddyColor = JSON.parse(localStorage.getItem('buddy-color')) || { c1: '#6c5ce7', c2: '#a29bfe' };
 let buddyHat = localStorage.getItem('buddy-hat') || 'none';
 let buddyShape = localStorage.getItem('buddy-shape') || 'default';
+let isDead = false;
+let distractionStartTime = null;
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
 // --- 2.1 TTS STATE ---
@@ -194,9 +196,28 @@ if (physicsAnimator) {
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
-    physicsAnimator.addEventListener('dblclick', (e) => {
-        window.flipBuddy(e);
+    physicsAnimator.addEventListener('dblclick', () => {
+        if (isDead) return;
+        window.openRadialMenu('main');
     });
+}
+
+function die() {
+    if (isDead) return;
+    isDead = true;
+    buddy.classList.add('dead');
+    physicsAnimator.classList.add('dead'); // For stopping animation
+    speak("I couldn't handle the distraction... I'm gone. Click me to revive me... if you care.");
+    if (window.stopPomodoro) window.stopPomodoro();
+}
+
+function revive() {
+    if (!isDead) return;
+    isDead = false;
+    buddy.classList.remove('dead');
+    physicsAnimator.classList.remove('dead');
+    distractionStartTime = null;
+    speak("I'm back! Let's stay focused this time, okay?");
 }
 
 window.addEventListener('pointerup', (e) => {
@@ -211,7 +232,11 @@ window.addEventListener('pointerup', (e) => {
         }
 
         if (!dragMoved) {
-            window.openRadialMenu('main');
+            if (isDead) {
+                revive();
+            } else {
+                window.openRadialMenu('main');
+            }
         }
     }
 });
@@ -537,6 +562,18 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground)
             } else {
                 buddy.classList.remove('angry');
                 buddy.classList.add('suspicious');
+            }
+
+            // --- 6.1 DEATH TIMER LOGIC ---
+            if (!isDead) {
+                if (!distractionStartTime) {
+                    distractionStartTime = Date.now();
+                } else {
+                    const elapsed = Date.now() - distractionStartTime;
+                    if (elapsed > 60000) {
+                        die();
+                    }
+                }
             }
         }
 
