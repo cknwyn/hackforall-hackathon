@@ -1,4 +1,11 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
+
+// Prevent accidental scaling/zooming
+webFrame.setVisualZoomLevelLimits(1, 1);
+webFrame.setZoomLevel(0);
+window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) e.preventDefault();
+}, { passive: false });
 
 // --- 1. CORE UI ELEMENTS ---
 const bubble = document.getElementById('buddy-bubble');
@@ -9,9 +16,14 @@ const overlay = document.getElementById('connect-overlay');
 const idBadge = document.getElementById('id-badge');
 const nameInputContainer = document.getElementById('name-input-container');
 const nameInput = document.getElementById('buddy-name-input');
+const radialContainer = document.getElementById('radial-menu-container');
+const bottomBar = document.getElementById('bottom-input-bar');
+const connectRequestText = document.getElementById('connect-request-text');
 
 // --- 2. GLOBAL STATE ---
 let db = null;
+let partnerRoomId = null;
+let requesterCode = null;
 let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
@@ -47,47 +59,74 @@ function finishLoading() {
 
 // --- 4. INTERACTION LOGIC (DRAGGING) ---
 let isDragging = false;
-let mouseX, mouseY;
+let dragOffsetX = 0, dragOffsetY = 0;
+let dragMoved = false;
 
 if (buddy) {
-    buddy.addEventListener('mousedown', (e) => {
+    buddy.addEventListener('pointerdown', (e) => {
         isDragging = true;
-        mouseX = e.clientX;
-        mouseY = e.clientY;
+        dragMoved = false;
+        dragOffsetX = e.clientX;
+        dragOffsetY = e.clientY;
+        buddy.setPointerCapture(e.pointerId);
         ipcRenderer.send('set-ignore-mouse-events', false);
+    });
+
+    // Fallback double click if needed
+    buddy.addEventListener('dblclick', () => {
+        window.openRadialMenu('main');
     });
 }
 
-window.addEventListener('mouseup', () => isDragging = false);
-window.addEventListener('mousemove', (e) => {
+window.addEventListener('pointerup', (e) => {
     if (isDragging) {
-        ipcRenderer.send('move-window', e.clientX - mouseX, e.clientY - mouseY);
+        isDragging = false;
+        if (buddy && buddy.hasPointerCapture(e.pointerId)) {
+            buddy.releasePointerCapture(e.pointerId);
+        }
+
+        // If they didn't really move the mouse, treat as a click to open menu
+        if (!dragMoved) {
+            window.openRadialMenu('main');
+        }
+    }
+});
+window.addEventListener('pointermove', (e) => {
+    if (isDragging) {
+        if (Math.abs(e.clientX - dragOffsetX) > 3 || Math.abs(e.clientY - dragOffsetY) > 3) {
+            dragMoved = true;
+            closeRadialMenu(); // hide if dragging
+            closeBottomBar();
+        }
+        ipcRenderer.send('move-window-absolute', e.screenX - dragOffsetX, e.screenY - dragOffsetY);
         return;
     }
-    
+
     // Check if mouse is over UI elements
     const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overRadial = radialContainer && (document.elementFromPoint(e.clientX, e.clientY) === radialContainer || radialContainer.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overBottomBar = bottomBar && (document.elementFromPoint(e.clientX, e.clientY) === bottomBar || bottomBar.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const isOverlayVisible = overlay && overlay.classList.contains('visible');
 
-    if (!overBuddy && !overBubble && !overBadge && !isOverlayVisible) {
+    if (!overBuddy && !overBubble && !overBadge && !overRadial && !overBottomBar && !isOverlayVisible) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
     }
 });
 
-// Wander Mode
-setInterval(() => {
-    if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
-    ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
-}, 10000);
+// Wander Mode - Disabled to prevent random jumping
+// setInterval(() => {
+//     if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
+//     ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+// }, 10000);
 
 // --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
 async function initFirebase() {
     updateStatus("Loading Bridge...");
-    
+
     try {
         // Use global 'firebase' from the CDN script
         if (typeof firebase === 'undefined') {
@@ -101,11 +140,14 @@ async function initFirebase() {
         db = firebase.firestore();
 
         updateStatus("Ready!");
-        setTimeout(finishLoading, 1000);
-        
+
+        // Quality of Life: Initialize room explicitly and wait for it
+        await db.collection("rooms").doc(roomId).set({ status: "idle", requestConnect: false });
+        finishLoading();
+
         setupTutorListener();
         speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
-        
+
     } catch (err) {
         console.error("Firebase Init Error:", err);
         updateStatus("Offline Mode");
@@ -128,23 +170,63 @@ function setupTutorListener() {
         const data = doc.data();
         if (!data) return;
 
+        // 1. Connection Request Logic
         if (data.requestConnect && data.status !== "connected") {
+            requesterCode = data.requesterCode;
+            connectRequestText.innerText = `Buddy ${requesterCode} wants to connect!`;
             overlay.classList.add('visible');
         } else if (data.status === "connected") {
             overlay.classList.remove('visible');
+            window.isPartnerConnected = true;
+
+            // QoL: Update badge text and style
+            idBadge.innerText = "Connected 🟢";
+            idBadge.style.color = '#00b894';
+            idBadge.style.background = 'white';
+            idBadge.style.opacity = '1';
+
+            if (!window.badgeHideTimeout) {
+                window.badgeHideTimeout = setTimeout(() => {
+                    idBadge.style.opacity = '0';
+                    idBadge.style.pointerEvents = 'none';
+                }, 5000);
+            }
+
+            if (data.requesterCode && !partnerRoomId) {
+                partnerRoomId = "hack-" + data.requesterCode;
+                console.log("Partner room identified:", partnerRoomId);
+            }
+        } else if (data.status === "idle") {
+            overlay.classList.remove('visible');
+            window.isPartnerConnected = false;
+
+            idBadge.style.display = 'block';
+            idBadge.style.opacity = '1';
+            idBadge.style.pointerEvents = 'auto';
+
+            if (window.badgeHideTimeout) {
+                clearTimeout(window.badgeHideTimeout);
+                window.badgeHideTimeout = null;
+            }
+            finishLoading();
+        } else {
+            window.isPartnerConnected = false;
         }
 
+        // 2. Incoming Messages
         if (data.status === "connected" && data.lastMessage && data.lastMessageTimestamp > (window.lastProcessedMsg || 0)) {
             speak(data.lastMessage);
             window.lastProcessedMsg = data.lastMessageTimestamp;
         }
 
+        // 3. Remote Commands
         if (data.status === "connected" && data.command) {
             handleRemoteCommand(data.command);
             db.collection("rooms").doc(roomId).update({ command: null });
         }
     });
 }
+
 
 function handleRemoteCommand(cmd) {
     if (cmd.type === 'wiggle') {
@@ -157,16 +239,258 @@ function handleRemoteCommand(cmd) {
     }
 }
 
-window.acceptTutor = () => {
+window.acceptBuddyUI = () => {
+    if (!requesterCode) return;
+
+    partnerRoomId = "hack-" + requesterCode;
     db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
     overlay.classList.remove('visible');
-    speak("Awesome! Let's get to work.");
+    speak("We're connected!");
 };
 
 window.rejectTutor = () => {
     db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
     overlay.classList.remove('visible');
 };
+
+window.disconnectBuddy = async () => {
+    speak("Disconnecting...");
+
+    // 1. Reset your own room
+    await db.collection("rooms").doc(roomId).update({
+        status: "idle",
+        requestConnect: false
+    });
+
+    // 2. Reset your partner's room if possible
+    if (partnerRoomId) {
+        await db.collection("rooms").doc(partnerRoomId).update({
+            status: "idle",
+            requestConnect: false
+        });
+        partnerRoomId = null;
+    }
+
+    // 3. UI Cleanup
+    closeBottomBar();
+    finishLoading();
+    speak("Disconnected. Time for a break!");
+};
+
+
+// --- 6. TUTOR/BUDDY SEND COMMANDS ---
+window.requestConnectionUI = async (val) => {
+    const friendCode = val.trim();
+    if (!friendCode || friendCode.length !== 4) {
+        speak("Need 4 digits!");
+        return;
+    }
+    partnerRoomId = "hack-" + friendCode;
+    updateStatus("Connecting...");
+    await db.collection("rooms").doc(partnerRoomId).set({
+        requestConnect: true,
+        requesterCode: roomId.replace('hack-', '')
+    }, { merge: true });
+    speak("Request sent!");
+    closeBottomBar();
+};
+
+window.sendCommandToBuddy = async (type, payload = {}) => {
+    if (!partnerRoomId) {
+        speak("Connect to a buddy first!");
+        return;
+    }
+    await db.collection("rooms").doc(partnerRoomId).set({
+        command: { type, ...payload, timestamp: Date.now() }
+    }, { merge: true });
+};
+
+window.sendMessageUI = async (msg) => {
+    if (!partnerRoomId) {
+        speak("Connect first!");
+        return;
+    }
+    if (!msg) return;
+    await db.collection("rooms").doc(partnerRoomId).set({
+        lastMessage: msg,
+        lastMessageTimestamp: Date.now(),
+        status: "connected"
+    }, { merge: true });
+    closeBottomBar();
+};
+
+// --- RADIAL MENU RENDERING ENGINE ---
+const RADIAL_RADIUS = 130; // Push further out from buddy
+
+const radialMenuData = {
+    main: [
+        { angle: 45, icon: '🖌️', action: () => openRadialMenu('customize'), color: '' },
+        { angle: -45, icon: '🌐', action: () => openRadialMenu('network'), color: '' },
+        { angle: 135, icon: '⚙️', action: () => openRadialMenu('settings'), color: '' },
+        { angle: -135, icon: '❌', action: () => closeRadialMenu(), color: 'btn-close' }
+    ],
+    customize: [
+        { angle: 45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: -45, icon: '🎨', action: () => openRadialMenu('colors'), color: '' },
+        { angle: 135, icon: '🎩', action: () => openRadialMenu('hats'), color: '' }
+    ],
+    colors: [
+        { angle: -45, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: 45, icon: '🔴', action: () => { applyColor('#d63031', '#ff7675'); closeRadialMenu(); }, color: 'btn-fire' },
+        { angle: 135, icon: '🟢', action: () => { applyColor('#00b894', '#55efc4'); closeRadialMenu(); }, color: 'btn-mint' },
+        { angle: -135, icon: '🔵', action: () => { applyColor('#0984e3', '#74b9ff'); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: 0, icon: '🟣', action: () => { applyColor('#6c5ce7', '#a29bfe'); closeRadialMenu(); }, color: '' },
+    ],
+    hats: [
+        { angle: 135, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: -45, icon: '🎩', action: () => { applyHat('🎩'); closeRadialMenu(); }, color: 'btn-fire' },
+        { angle: 45, icon: '👑', action: () => { applyHat('👑'); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: -135, icon: '🚫', action: () => { applyHat('none'); closeRadialMenu(); }, color: 'btn-close' }
+    ],
+    network: [
+        { angle: -45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '🔓', action: () => openBottomBar('connect'), color: '' },
+        { angle: 135, icon: '💬', action: () => openBottomBar('message'), color: '' },
+        { angle: -135, icon: '👋', action: () => { window.sendCommandToBuddy('wiggle'); closeRadialMenu(); }, color: '' }
+    ],
+    settings: [
+        { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' }
+    ]
+};
+
+window.openRadialMenu = (viewId) => {
+    closeBottomBar();
+    radialContainer.innerHTML = ''; // Clear prev
+    const nodes = radialMenuData[viewId];
+    if (!nodes) return;
+
+    nodes.forEach((node, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'radial-btn-wrapper';
+
+        // Use standard Rotate/Translate to map angle easily using CSS
+        // Ensure negative numbers don't print double-minuses
+        wrapper.style.transform = `rotate(${node.angle}deg) translateY(-${RADIAL_RADIUS}px) rotate(${-node.angle}deg)`;
+
+        const btn = document.createElement('button');
+        btn.className = `radial-btn ${node.color}`;
+        btn.innerText = node.icon;
+        btn.onclick = node.action;
+
+        wrapper.appendChild(btn);
+        radialContainer.appendChild(wrapper);
+
+        // trigger animation after a tiny delay so it pops out
+        setTimeout(() => {
+            wrapper.classList.add('active');
+        }, 10 + index * 50); // Stagger pop-out
+    });
+};
+
+window.closeRadialMenu = () => {
+    radialContainer.innerHTML = '';
+};
+
+// --- DYNAMIC BOTTOM BAR FORMS ---
+window.openBottomBar = (mode) => {
+    closeRadialMenu();
+    const input = document.getElementById('dynamic-input');
+    const btn = document.getElementById('dynamic-btn');
+    const statusDot = document.getElementById('partner-status');
+
+    bottomBar.classList.add('visible');
+    input.value = '';
+    statusDot.style.display = 'none';
+
+    if (mode === 'connect') {
+        input.placeholder = 'Partner Code (4 Digits)';
+        input.maxLength = 4;
+        btn.innerText = 'LINK';
+        btn.onclick = () => window.requestConnectionUI(input.value);
+        if (window.isPartnerConnected) {
+            statusDot.style.display = 'inline-block';
+            statusDot.classList.add('connected');
+            btn.innerText = 'DISCONNECT';
+            btn.onclick = () => window.disconnectBuddy();
+        }
+    } else if (mode === 'message') {
+        input.placeholder = 'Type a message...';
+        input.removeAttribute('maxLength');
+        btn.innerText = 'SEND';
+        btn.onclick = () => window.sendMessageUI(input.value);
+    }
+    input.onkeypress = (e) => { if (e.key === 'Enter') btn.click(); };
+    setTimeout(() => input.focus(), 150);
+};
+
+window.closeBottomBar = () => {
+    bottomBar.classList.remove('visible');
+};
+
+// --- Customizations ---
+window.applyColor = (c1, c2) => {
+    if (buddy) buddy.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+};
+
+window.applyHat = (hatStr) => {
+    const hatOverlay = document.getElementById('hat-overlay');
+    if (hatOverlay) {
+        if (hatStr === 'none') {
+            hatOverlay.innerText = '';
+        } else {
+            hatOverlay.innerText = hatStr;
+        }
+    }
+};
+
+// --- 6. DISTRACTION WATCHDOG LISTENER ---
+let lastWarningSpeakTime = 0;
+let distractionHeartbeat;
+
+ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
+    if (isDistracted) {
+        // Keep the Buddy in the "Angry" state (Wiggle + Red Glow)
+        if (buddy && !buddy.classList.contains('angry')) {
+            buddy.classList.add('angry');
+
+            // Flip back to robot face if distracted while in settings
+            const container = document.getElementById('buddy-container');
+            if (container && container.classList.contains('flipped')) {
+                window.toggleControlPanel();
+            }
+        }
+
+        // Refresh the heartbeat timeout (if we don't hear back in 4s, cool down)
+        clearTimeout(distractionHeartbeat);
+        distractionHeartbeat = setTimeout(() => {
+            if (buddy) buddy.classList.remove('angry');
+        }, 4000);
+    } else {
+        // Cool down if the main process specifically says we are not distracted
+        if (buddy) buddy.classList.remove('angry');
+    }
+});
+
+ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
+    console.log(`Watchdog: Caught user looking at ${appName}!`);
+
+    // Throttled speech warnings
+    const now = Date.now();
+    if (now - lastWarningSpeakTime > 30000) {
+        const warnings = [
+            `Hey! Get off ${appName} and get back to work!`,
+            `I see you looking at ${appName}... Focus!`,
+            `Are we studying or are we playing on ${appName}?`,
+            `Eyes on the code, not on ${appName}! 😠`
+        ];
+
+        const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
+        speak(randomWarning, 4000);
+        lastWarningSpeakTime = now;
+    }
+});
+
 
 // --- STARTUP ---
 document.addEventListener('DOMContentLoaded', () => {

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>Buddy Tutor</title>
@@ -10,12 +11,13 @@
         body {
             margin: 0;
             padding: 0;
-            width: 300px;
-            height: 300px;
+            width: 400px;
+            height: 400px;
             overflow: hidden;
             background: transparent;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            user-select: none; /* Prevent text selection during drag */
+            user-select: none;
+            /* Prevent text selection during drag */
         }
 
         .buddy-container {
@@ -26,7 +28,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            pointer-events: none; /* Let clicks pass through empty space */
+            pointer-events: none;
+            /* Let clicks pass through empty space */
         }
 
         /* The Robot Character */
@@ -36,13 +39,14 @@
             height: 140px;
             background: linear-gradient(135deg, #6c5ce7, #a29bfe);
             border-radius: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             animation: float 3s ease-in-out infinite;
-            pointer-events: auto; /* Make the buddy itself clickable */
+            pointer-events: auto;
+            /* Make the buddy itself clickable */
             cursor: grab;
             transition: transform 0.1s ease-out;
         }
@@ -51,7 +55,14 @@
             cursor: grabbing;
         }
 
-        .buddy::before { /* Head antenna */
+        .buddy.angry {
+            animation: wiggle 0.2s ease infinite !important;
+            box-shadow: 0 0 40px #ff7675 !important;
+            background: linear-gradient(135deg, #ff4757, #ff6b81) !important;
+        }
+
+        .buddy::before {
+            /* Head antenna */
             content: '';
             position: absolute;
             top: -15px;
@@ -60,7 +71,8 @@
             background: #6c5ce7;
         }
 
-        .buddy::after { /* Head antenna tip */
+        .buddy::after {
+            /* Head antenna tip */
             content: '';
             position: absolute;
             top: -22px;
@@ -95,25 +107,61 @@
 
         /* Animations */
         @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         @keyframes wiggle {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(5deg); }
-            50% { transform: rotate(-5deg); }
-            75% { transform: rotate(5deg); }
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(5deg);
+            }
+
+            50% {
+                transform: rotate(-5deg);
+            }
+
+            75% {
+                transform: rotate(5deg);
+            }
         }
 
         @keyframes blink {
-            0%, 45%, 55%, 100% { transform: scaleY(1); }
-            50% { transform: scaleY(0.1); }
+
+            0%,
+            45%,
+            55%,
+            100% {
+                transform: scaleY(1);
+            }
+
+            50% {
+                transform: scaleY(0.1);
+            }
         }
 
         @keyframes blink-light {
-            from { background: #e17055; box-shadow: 0 0 5px #e17055; }
-            to { background: #fab1a0; box-shadow: 0 0 15px #ff7675; }
+            from {
+                background: #e17055;
+                box-shadow: 0 0 5px #e17055;
+            }
+
+            to {
+                background: #fab1a0;
+                box-shadow: 0 0 15px #ff7675;
+            }
         }
 
         /* Speech Bubble */
@@ -123,7 +171,7 @@
             background: white;
             padding: 15px;
             border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             max-width: 200px;
             opacity: 0;
             transform: translateY(10px);
@@ -164,13 +212,17 @@
             font-size: 11px;
             font-weight: bold;
             color: #6c5ce7;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             z-index: 100;
             cursor: pointer;
             border: 1px solid #a29bfe;
             transition: all 0.2s;
         }
-        .id-badge:hover { transform: scale(1.05); background: white; }
+
+        .id-badge:hover {
+            transform: scale(1.05);
+            background: white;
+        }
 
         #name-input-container {
             position: absolute;
@@ -178,6 +230,7 @@
             z-index: 101;
             display: none;
         }
+
         #name-input-container input {
             padding: 5px 10px;
             border-radius: 10px;
@@ -234,23 +287,265 @@
             transition: transform 0.2s;
         }
 
-        .btn-accept { background: #55efc4; color: #00b894; }
-        .btn-reject { background: #ff7675; color: white; }
-        .btn:hover { transform: scale(1.1); }
+        .btn-accept {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .btn-reject {
+            background: #ff7675;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Radial Menu Wrappers */
+        #radial-menu-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            z-index: 400;
+        }
+
+        .radial-btn-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            pointer-events: none;
+            /* Will be translated using JS: transform: rotate(Xdeg) translateY(-100px) rotate(-Xdeg) */
+        }
+
+        .radial-btn-wrapper.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Solid Color Buttons */
+        .radial-btn {
+            width: 50px;
+            height: 50px;
+            margin-top: -25px;
+            margin-left: -25px;
+            background: #6c5ce7;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .radial-btn:hover {
+            transform: scale(1.15);
+            background: #a29bfe;
+        }
+
+        .btn-fire {
+            background: #d63031;
+        }
+
+        .btn-mint {
+            background: #00b894;
+        }
+
+        .btn-sky {
+            background: #0984e3;
+        }
+
+        .btn-back {
+            background: #2d3436;
+        }
+
+        .btn-close {
+            background: #ff7675;
+        }
+
+        /* Hats Overlay Layer */
+        .hat-layer {
+            position: absolute;
+            top: -40px;
+            font-size: 40px;
+            z-index: 10;
+            pointer-events: none;
+            transition: transform 0.3s;
+        }
+
+        /* Bottom Input Bar for text tasks */
+        #bottom-input-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 10px 15px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 500;
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            align-items: center;
+        }
+
+        #bottom-input-bar.visible {
+            transform: translateY(0);
+        }
+
+        #bottom-input-bar input {
+            flex: 1;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 8px 10px;
+            outline: none;
+            font-size: 13px;
+        }
+
+        #bottom-input-bar input:focus {
+            border-color: #6c5ce7;
+        }
+
+        .bar-btn {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .bar-btn:hover {
+            background: #5849c4;
+        }
+
+        #control-panel.visible {
+            transform: translateY(0);
+        }
+
+        #control-panel h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #6c5ce7;
+            text-align: center;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        #control-panel input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        #control-panel input:focus {
+            border-color: #6c5ce7;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 11px;
+            border-radius: 8px;
+            border: none;
+            background: #6c5ce7;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-small:hover {
+            background: #5849c4;
+        }
+
+        .btn-small:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .interaction-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+
+        .btn-icon {
+            padding: 10px;
+            font-size: 16px;
+            background: #f0f2f5;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: #e2e4e7;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .status-dot.connected {
+            background: #55efc4;
+            box-shadow: 0 0 5px #55efc4;
+        }
     </style>
+
 </head>
+
 <body>
     <div id="connect-overlay">
-        <p>A tutor wants to help! Accept?</p>
+        <p id="connect-request-text">A tutor wants to help! Accept?</p>
         <div class="btn-group">
-            <button class="btn btn-accept" onclick="acceptTutor()">Yes</button>
+            <button class="btn btn-accept" onclick="acceptBuddyUI()">Yes</button>
             <button class="btn btn-reject" onclick="rejectTutor()">No</button>
         </div>
     </div>
 
+    <!-- Radial Menu Engine -->
+    <div id="radial-menu-container">
+        <!-- Rendered completely by JS but we can place static wrappers here if we want. We'll populate dynamically in JS! -->
+    </div>
+
+    <!-- Bottom Input Bar -->
+    <div id="bottom-input-bar">
+        <!-- Re-used between Network/Settings -->
+        <span id="partner-status" class="status-dot" style="display:none;"></span>
+        <input type="text" id="dynamic-input" placeholder="...">
+        <button id="dynamic-btn" class="bar-btn">GO</button>
+        <button class="bar-btn btn-back" onclick="closeBottomBar()">❌</button>
+    </div>
+
+
     <div id="id-badge" class="id-badge" onclick="toggleNameInput()">Loading...</div>
     <div id="name-input-container">
-        <input type="text" id="buddy-name-input" placeholder="Name your buddy..." onkeypress="if(event.key==='Enter') saveBuddyName()">
+        <input type="text" id="buddy-name-input" placeholder="Name your buddy..."
+            onkeypress="if(event.key==='Enter') saveBuddyName()">
     </div>
 
     <div class="buddy-container">
@@ -258,6 +553,7 @@
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
         </div>
         <div id="main-buddy" class="buddy">
+            <div id="hat-overlay" class="hat-layer"></div>
             <div class="eyes">
                 <div class="eye"></div>
                 <div class="eye"></div>
@@ -268,4 +564,5 @@
 
     <script src="renderer.js"></script>
 </body>
+
 </html>
