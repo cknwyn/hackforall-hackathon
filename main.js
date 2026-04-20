@@ -61,50 +61,37 @@ function createWindow() {
   initWatchdog(win);
 }
 
-// Watchdog helper (Wide Radar - Multi-Monitor / Multi-Window Support)
+// Watchdog helper (Native PowerShell Approach - Robust Version)
 function initWatchdog(win) {
   let lastWarningTime = 0;
 
-  // PowerShell command to get ALL windows + identify which one is in the Foreground
-  const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$fg = (Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); }' -PassThru)::GetForegroundWindow(); Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle } | Select-Object -Property ProcessName, MainWindowTitle, @{Name='IsForeground'; Expression={$_.MainWindowHandle -eq $fg}} | ConvertTo-Json -Compress"`;
+  // Optimized PowerShell one-liner to get ProcessName and Title as JSON
+  const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Process | Where-Object { $_.MainWindowHandle -eq (Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); }' -PassThru)::GetForegroundWindow() } | Select-Object -Property ProcessName, MainWindowTitle | ConvertTo-Json -Compress"`;
 
   setInterval(() => {
     exec(psCommand, (error, stdout, stderr) => {
       if (error || !stdout) return;
 
       try {
-        let windows = JSON.parse(stdout);
-        // Ensure windows is an array (JSON.parse might return a single object if only one window exists)
-        if (!Array.isArray(windows)) windows = [windows];
+        const data = JSON.parse(stdout);
+        const title = (data.MainWindowTitle || "").toLowerCase();
+        const appName = (data.ProcessName || "").toLowerCase();
 
-        let foregroundDistraction = null;
-        let backgroundDistraction = null;
+        // Log for debugging
+        // console.log(`Watchdog sees: [${appName}] "${title}"`);
 
-        for (const w of windows) {
-          const title = (w.MainWindowTitle || "").toLowerCase();
-          const appName = (w.ProcessName || "").toLowerCase();
-          const isFg = w.IsForeground === true;
+        const caughtApp = DISTRACTIONS.find(badWord =>
+          title.includes(badWord) || appName.includes(badWord)
+        );
 
-          const match = DISTRACTIONS.find(badWord => title.includes(badWord) || appName.includes(badWord));
-          
-          if (match) {
-            if (isFg) foregroundDistraction = { app: match, title: w.MainWindowTitle };
-            else backgroundDistraction = { app: match, title: w.MainWindowTitle };
-          }
-        }
-
-        // Send state to renderer
-        const isDistracted = !!(foregroundDistraction || backgroundDistraction);
-        const isForeground = !!foregroundDistraction;
-        const caughtApp = foregroundDistraction?.app || backgroundDistraction?.app;
-
-        win.webContents.send('distraction-state', isDistracted, caughtApp, isForeground);
+        // Always report current state to renderer
+        win.webContents.send('distraction-state', !!caughtApp, caughtApp);
 
         const now = Date.now();
-        if (isDistracted && (now - lastWarningTime > 30000)) {
-          const type = isForeground ? "CAUGHT" : "SUSPICIOUS";
-          console.log(`Watchdog: [${type}] Distraction detected: ${caughtApp}`);
-          win.webContents.send('trigger-distraction-warning', caughtApp, isForeground);
+        if (caughtApp && (now - lastWarningTime > 30000)) {
+          console.log(`Watchdog: ALERT! Distraction detected in ${appName}: ${title}`);
+          // trigger-distraction-warning is now just for speech/text alerts
+          win.webContents.send('trigger-distraction-warning', caughtApp);
           lastWarningTime = now;
         }
       } catch (e) {

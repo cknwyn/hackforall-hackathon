@@ -84,7 +84,7 @@ window.addEventListener('pointerup', (e) => {
         if (buddy && buddy.hasPointerCapture(e.pointerId)) {
             buddy.releasePointerCapture(e.pointerId);
         }
-        
+
         // If they didn't really move the mouse, treat as a click to open menu
         if (!dragMoved) {
             window.openRadialMenu('main');
@@ -207,7 +207,7 @@ function setupTutorListener() {
         } else if (data.status === "idle") {
             overlay.classList.remove('visible');
             window.isPartnerConnected = false;
-            
+
             idBadge.style.display = 'block';
             idBadge.style.opacity = '1';
             idBadge.style.pointerEvents = 'auto';
@@ -363,7 +363,7 @@ const radialMenuData = {
     ],
     settings: [
         { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
-        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display='block'; closeRadialMenu(); }, color: '' }
+        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' }
     ]
 };
 
@@ -376,10 +376,10 @@ window.openRadialMenu = (viewId) => {
     nodes.forEach((node, index) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'radial-btn-wrapper';
-        
+
         // Use standard Rotate/Translate to map angle easily using CSS
         // Ensure negative numbers don't print double-minuses
-        wrapper.style.transform = `rotate(${node.angle}deg) translateY(-${RADIAL_RADIUS}px) rotate(${ -node.angle }deg)`;
+        wrapper.style.transform = `rotate(${node.angle}deg) translateY(-${RADIAL_RADIUS}px) rotate(${-node.angle}deg)`;
 
         const btn = document.createElement('button');
         btn.className = `radial-btn ${node.color}`;
@@ -406,7 +406,7 @@ window.openBottomBar = (mode) => {
     const input = document.getElementById('dynamic-input');
     const btn = document.getElementById('dynamic-btn');
     const statusDot = document.getElementById('partner-status');
-    
+
     bottomBar.classList.add('visible');
     input.value = '';
     statusDot.style.display = 'none';
@@ -428,7 +428,7 @@ window.openBottomBar = (mode) => {
         btn.innerText = 'SEND';
         btn.onclick = () => window.sendMessageUI(input.value);
     }
-    input.onkeypress = (e) => { if(e.key === 'Enter') btn.click(); };
+    input.onkeypress = (e) => { if (e.key === 'Enter') btn.click(); };
     setTimeout(() => input.focus(), 150);
 };
 
@@ -456,64 +456,45 @@ window.applyHat = (hatStr) => {
 let lastWarningSpeakTime = 0;
 let distractionHeartbeat;
 
-ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground) => {
+ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
     if (isDistracted) {
-        if (buddy) {
-            // Priority: Angry if in foreground, Suspicious if in background
-            if (isForeground) {
-                buddy.classList.remove('suspicious');
-                buddy.classList.add('angry');
-            } else {
-                buddy.classList.remove('angry');
-                buddy.classList.add('suspicious');
-            }
-            
-            // Auto-flip back if something bad is happenning
+        // Keep the Buddy in the "Angry" state (Wiggle + Red Glow)
+        if (buddy && !buddy.classList.contains('angry')) {
+            buddy.classList.add('angry');
+
+            // Flip back to robot face if distracted while in settings
             const container = document.getElementById('buddy-container');
             if (container && container.classList.contains('flipped')) {
                 window.toggleControlPanel();
             }
         }
-        
+
+        // Refresh the heartbeat timeout (if we don't hear back in 4s, cool down)
         clearTimeout(distractionHeartbeat);
         distractionHeartbeat = setTimeout(() => {
-            if (buddy) {
-                buddy.classList.remove('angry');
-                buddy.classList.remove('suspicious');
-            }
+            if (buddy) buddy.classList.remove('angry');
         }, 4000);
     } else {
-        if (buddy) {
-            buddy.classList.remove('angry');
-            buddy.classList.remove('suspicious');
-        }
+        // Cool down if the main process specifically says we are not distracted
+        if (buddy) buddy.classList.remove('angry');
     }
 });
 
-ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => {
-    console.log(`Watchdog: Caught user looking at ${appName} (Foreground: ${isForeground})`);
-    
+ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
+    console.log(`Watchdog: Caught user looking at ${appName}!`);
+
+    // Throttled speech warnings
     const now = Date.now();
     if (now - lastWarningSpeakTime > 30000) {
-        let warnings = [];
-        
-        if (isForeground) {
-            warnings = [
-                `Hey! Get off ${appName} and get back to work!`,
-                `I see you looking at ${appName}... Focus!`,
-                `Eyes on the code, not on ${appName}! 😠`
-            ];
-        } else {
-            warnings = [
-                `I see ${appName} running on the side... No cheating!`,
-                `Is that ${appName} I see on your other monitor? 🤨`,
-                `You might be focused here, but ${appName} is still there. Close it!`,
-                `I smell ${appName} in the background. Don't think I can't see it!`
-            ];
-        }
-        
+        const warnings = [
+            `Hey! Get off ${appName} and get back to work!`,
+            `I see you looking at ${appName}... Focus!`,
+            `Are we studying or are we playing on ${appName}?`,
+            `Eyes on the code, not on ${appName}! 😠`
+        ];
+
         const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
-        speak(randomWarning, 4000); 
+        speak(randomWarning, 4000);
         lastWarningSpeakTime = now;
     }
 });
