@@ -1,4 +1,11 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
+
+// Prevent accidental scaling/zooming
+webFrame.setVisualZoomLevelLimits(1, 1);
+webFrame.setZoomLevel(0);
+window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) e.preventDefault();
+}, { passive: false });
 
 // --- 1. CORE UI ELEMENTS ---
 const bubble = document.getElementById('buddy-bubble');
@@ -55,13 +62,14 @@ function finishLoading() {
 
 // --- 4. INTERACTION LOGIC (DRAGGING) ---
 let isDragging = false;
-let mouseX, mouseY;
+let dragOffsetX = 0, dragOffsetY = 0;
 
 if (buddy) {
-    buddy.addEventListener('mousedown', (e) => {
+    buddy.addEventListener('pointerdown', (e) => {
         isDragging = true;
-        mouseX = e.clientX;
-        mouseY = e.clientY;
+        dragOffsetX = e.clientX;
+        dragOffsetY = e.clientY;
+        buddy.setPointerCapture(e.pointerId);
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
@@ -74,10 +82,17 @@ if (buddy) {
     });
 }
 
-window.addEventListener('mouseup', () => isDragging = false);
-window.addEventListener('mousemove', (e) => {
+window.addEventListener('pointerup', (e) => {
     if (isDragging) {
-        ipcRenderer.send('move-window', e.clientX - mouseX, e.clientY - mouseY);
+        isDragging = false;
+        if (buddy && buddy.hasPointerCapture(e.pointerId)) {
+            buddy.releasePointerCapture(e.pointerId);
+        }
+    }
+});
+window.addEventListener('pointermove', (e) => {
+    if (isDragging) {
+        ipcRenderer.send('move-window-absolute', e.screenX - dragOffsetX, e.screenY - dragOffsetY);
         return;
     }
 
@@ -95,11 +110,11 @@ window.addEventListener('mousemove', (e) => {
     }
 });
 
-// Wander Mode
-setInterval(() => {
-    if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
-    ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
-}, 10000);
+// Wander Mode - Disabled to prevent random jumping
+// setInterval(() => {
+//     if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
+//     ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+// }, 10000);
 
 // --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
 async function initFirebase() {
