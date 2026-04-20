@@ -31,6 +31,7 @@ const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 let voices = [];
 let selectedVoice = null;
 let voicePreference = localStorage.getItem('buddy-voice-pref') || 'male';
+let voiceVolume = parseFloat(localStorage.getItem('buddy-voice-volume')) || 1.0;
 
 function initTTS() {
     const loadVoices = () => {
@@ -74,6 +75,7 @@ function speakVerbal(message) {
 
     const utterance = new SpeechSynthesisUtterance(message);
     if (selectedVoice) utterance.voice = selectedVoice;
+    utterance.volume = voiceVolume;
 
     utterance.onstart = () => {
         if (mouth) {
@@ -424,7 +426,8 @@ const radialMenuData = {
     settings: [
         { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
         { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' },
-        { angle: -45, icon: '🗣️', action: () => { window.toggleVoicePreference(); closeRadialMenu(); }, color: 'btn-sky' }
+        { angle: -45, icon: '🗣️', action: () => { window.toggleVoicePreference(); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: 0, icon: '🔊', action: () => openBottomBar('volume'), color: 'btn-mint' }
     ]
 };
 
@@ -465,11 +468,18 @@ window.closeRadialMenu = () => {
 window.openBottomBar = (mode) => {
     closeRadialMenu();
     const input = document.getElementById('dynamic-input');
+    const slider = document.getElementById('volume-slider');
+    const label = document.getElementById('bar-label');
     const btn = document.getElementById('dynamic-btn');
     const statusDot = document.getElementById('partner-status');
 
     bottomBar.classList.add('visible');
     input.value = '';
+    
+    // Default visibility
+    input.style.display = 'block';
+    slider.style.display = 'none';
+    label.style.display = 'none';
     statusDot.style.display = 'none';
 
     if (mode === 'connect') {
@@ -488,9 +498,26 @@ window.openBottomBar = (mode) => {
         input.removeAttribute('maxLength');
         btn.innerText = 'SEND';
         btn.onclick = () => window.sendMessageUI(input.value);
+    } else if (mode === 'volume') {
+        input.style.display = 'none';
+        slider.style.display = 'block';
+        label.style.display = 'block';
+        label.innerText = 'VOL';
+        slider.value = voiceVolume;
+        btn.innerText = 'OK';
+        btn.onclick = () => {
+             voiceVolume = parseFloat(slider.value);
+             localStorage.setItem('buddy-voice-volume', voiceVolume);
+             speak(`Volume: ${Math.round(voiceVolume * 100)}%`);
+             closeBottomBar();
+        };
+        // Live feedback
+        slider.oninput = () => {
+             voiceVolume = parseFloat(slider.value);
+        };
     }
     input.onkeypress = (e) => { if (e.key === 'Enter') btn.click(); };
-    setTimeout(() => input.focus(), 150);
+    if (mode !== 'volume') setTimeout(() => input.focus(), 150);
 };
 
 window.closeBottomBar = () => {

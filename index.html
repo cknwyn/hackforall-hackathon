@@ -412,8 +412,20 @@
             font-size: 13px;
         }
 
-        #bottom-input-bar input:focus {
+        #bottom-input-bar input[type="text"]:focus {
             border-color: #6c5ce7;
+        }
+
+        #bottom-input-bar input[type="range"] {
+            accent-color: #6c5ce7;
+            cursor: pointer;
+        }
+
+        .bar-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #6c5ce7;
+            margin-right: 5px;
         }
 
         .bar-btn {
@@ -536,7 +548,9 @@
     <div id="bottom-input-bar">
         <!-- Re-used between Network/Settings -->
         <span id="partner-status" class="status-dot" style="display:none;"></span>
+        <span id="bar-label" class="bar-label" style="display:none;"></span>
         <input type="text" id="dynamic-input" placeholder="...">
+        <input type="range" id="volume-slider" min="0" max="1" step="0.1" style="display:none; flex: 1;">
         <button id="dynamic-btn" class="bar-btn">GO</button>
         <button class="bar-btn btn-back" onclick="closeBottomBar()">❌</button>
     </div>
