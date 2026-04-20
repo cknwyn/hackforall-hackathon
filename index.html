@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Buddy Tutor</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 300px;
+            height: 300px;
+            overflow: hidden;
+            background: transparent;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-app-region: drag; /* Make the whole buddy draggable */
+        }
+
+        .buddy-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* Let clicks pass through empty space */
+        }
+
+        /* The Robot Character */
+        .buddy {
+            position: relative;
+            width: 120px;
+            height: 140px;
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: float 3s ease-in-out infinite;
+            pointer-events: auto; /* Make the buddy itself clickable */
+            -webkit-app-region: no-drag;
+        }
+
+        .buddy::before { /* Head antenna */
+            content: '';
+            position: absolute;
+            top: -15px;
+            width: 4px;
+            height: 15px;
+            background: #6c5ce7;
+        }
+
+        .buddy::after { /* Head antenna tip */
+            content: '';
+            position: absolute;
+            top: -22px;
+            width: 10px;
+            height: 10px;
+            background: #e17055;
+            border-radius: 50%;
+            animation: blink-light 1s infinite alternate;
+        }
+
+        .eyes {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .eye {
+            width: 15px;
+            height: 15px;
+            background: #fff;
+            border-radius: 50%;
+            animation: blink 4s infinite;
+        }
+
+        .mouth {
+            width: 40px;
+            height: 5px;
+            background: #fff;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes blink {
+            0%, 45%, 55%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.1); }
+        }
+
+        @keyframes blink-light {
+            from { background: #e17055; box-shadow: 0 0 5px #e17055; }
+            to { background: #fab1a0; box-shadow: 0 0 15px #ff7675; }
+        }
+
+        /* Speech Bubble */
+        .bubble {
+            position: absolute;
+            bottom: 220px;
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            max-width: 200px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto;
+            -webkit-app-region: no-drag;
+        }
+
+        .bubble.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid white;
+        }
+
+        .message {
+            font-size: 14px;
+            color: #2d3436;
+            margin: 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="buddy-container">
+        <div id="buddy-bubble" class="bubble">
+            <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
+        </div>
+        <div id="main-buddy" class="buddy">
+            <div class="eyes">
+                <div class="eye"></div>
+                <div class="eye"></div>
+            </div>
+            <div id="buddy-mouth" class="mouth"></div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

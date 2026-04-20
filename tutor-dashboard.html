@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Buddy Tutor Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 400px;
+            text-align: center;
+        }
+        h1 { color: #6c5ce7; margin-bottom: 25px; }
+        input {
+            width: 80%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        button {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover { background: #a29bfe; }
+        .hint {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #636e72;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tutor Control</h1>
+        <p>Send a message to the Buddy:</p>
+        <input type="text" id="msgInput" placeholder="Type something helpful...">
+        <br>
+        <button onclick="sendMessage()">Send to Buddy</button>
+
+        <div class="hint">
+            <p>Note: This requires the Firebase config to be set up in both the app and this dashboard to work live.</p>
+        </div>
+    </div>
+
+    <script>
+        function sendMessage() {
+            const msg = document.getElementById('msgInput').value;
+            if (!msg) return;
+
+            console.log("Sending:", msg);
+            // In a real implementation, this would update Firebase:
+            // db.collection("rooms").doc("hackathon-room-001").update({ lastMessage: msg });
+            
+            alert("In a full build, this message would appear on the student's screen via Firebase!");
+            document.getElementById('msgInput').value = '';
+        }
+    </script>
+</body>
+</html>
