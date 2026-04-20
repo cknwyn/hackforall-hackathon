@@ -1,25 +1,24 @@
 const { ipcRenderer } = require('electron');
 
-// --- FIREBASE CONFIGURATION ---
-// PASTE YOUR FIREBASE CONFIG HERE
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// --- APP LOGIC ---
-
+// --- 1. CORE UI ELEMENTS ---
 const bubble = document.getElementById('buddy-bubble');
 const text = document.getElementById('buddy-text');
 const mouth = document.getElementById('buddy-mouth');
 const buddy = document.getElementById('main-buddy');
+const overlay = document.getElementById('connect-overlay');
+const idBadge = document.getElementById('id-badge');
+const nameInputContainer = document.getElementById('name-input-container');
+const nameInput = document.getElementById('buddy-name-input');
 
-// Function to make buddy speak
+// --- 2. GLOBAL STATE ---
+let db = null;
+let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
+const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
+
+// --- 3. BASIC BUDDY FUNCTIONS (ALWAYS WORK) ---
 function speak(message, duration = 3000) {
+    console.log("Buddy says:", message);
+    if (!text || !bubble || !mouth) return;
     text.innerText = message;
     bubble.classList.add('visible');
     mouth.style.height = '10px';
@@ -32,70 +31,153 @@ function speak(message, duration = 3000) {
     }, duration);
 }
 
-// Function to move buddy (relative to its container or window)
-// Since we are in a small window, we can also move the window itself using IPC
-// But for now, let's just animate within the 300x300 space or use IPC
-function moveWindow(x, y) {
-    // Current behavior: just small internal movement for effect
-    buddy.style.transform = `translate(${x}px, ${y}px)`;
-}
-
-// Initial Greeting
-setTimeout(() => {
-    speak("Hello! I'm ready to help you learn!");
-}, 1000);
-
-// --- FIREBASE INITIALIZATION (Optional - will fail until config provided) ---
-try {
-    const firebase = require('firebase/app');
-    require('firebase/firestore');
-
-    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        // Listen for tutor commands
-        // Room ID could be hardcoded or passed as a param
-        const roomId = "hackathon-room-001"; 
-        
-        db.collection("rooms").doc(roomId).onSnapshot((doc) => {
-            const data = doc.data();
-            if (data) {
-                if (data.lastMessage) {
-                    speak(data.lastMessage);
-                }
-                if (data.position) {
-                    // Logically, we would move the window here
-                    // ipcRenderer.send('move-buddy', data.position);
-                }
-            }
-        });
-    } else {
-        console.warn("Firebase not configured. Using local/mock mode.");
+function updateStatus(status) {
+    if (idBadge) {
+        idBadge.innerText = status;
+        idBadge.style.color = '#e17055'; // Orange-ish while loading
     }
-} catch (e) {
-    console.error("Firebase error:", e.message);
 }
 
-// Handle mouse transparency
-// When mouse enters the buddy, we want to capture clicks.
-// When it's in the transparent area, we want to ignore them.
-buddy.addEventListener('mouseenter', () => {
-    ipcRenderer.send('set-ignore-mouse-events', false);
-});
+function finishLoading() {
+    if (idBadge) {
+        idBadge.innerText = `${buddyName} | Code: ${roomId.replace('hack-', '')}`;
+        idBadge.style.color = '#6c5ce7'; // Purple when ready
+    }
+}
 
-bubble.addEventListener('mouseenter', () => {
-    ipcRenderer.send('set-ignore-mouse-events', false);
-});
+// --- 4. INTERACTION LOGIC (DRAGGING) ---
+let isDragging = false;
+let mouseX, mouseY;
 
+if (buddy) {
+    buddy.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        ipcRenderer.send('set-ignore-mouse-events', false);
+    });
+}
+
+window.addEventListener('mouseup', () => isDragging = false);
 window.addEventListener('mousemove', (e) => {
-    // If the mouse is NOT over the buddy or bubble, set ignore true
-    const overBuddy = document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY));
-    const overBubble = document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY));
+    if (isDragging) {
+        ipcRenderer.send('move-window', e.clientX - mouseX, e.clientY - mouseY);
+        return;
+    }
     
-    if (!overBuddy && !overBubble) {
+    // Check if mouse is over UI elements
+    const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const isOverlayVisible = overlay && overlay.classList.contains('visible');
+
+    if (!overBuddy && !overBubble && !overBadge && !isOverlayVisible) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
     }
+});
+
+// Wander Mode
+setInterval(() => {
+    if (isDragging || (overlay && overlay.classList.contains('visible'))) return;
+    ipcRenderer.send('move-window', (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+}, 10000);
+
+// --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
+async function initFirebase() {
+    updateStatus("Loading Bridge...");
+    
+    try {
+        // Use global 'firebase' from the CDN script
+        if (typeof firebase === 'undefined') {
+            throw new Error("Firebase CDN scripts failed to load.");
+        }
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
+          authDomain: "hackforall-hackathon.firebaseapp.com",
+          projectId: "hackforall-hackathon",
+          storageBucket: "hackforall-hackathon.firebasestorage.app",
+          messagingSenderId: "391540276748",
+          appId: "1:391540276748:web:a300ce599dbae051647829",
+          measurementId: "G-YTSKDSS1W4"
+        };
+
+        updateStatus("Connecting DB...");
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+
+        updateStatus("Ready!");
+        setTimeout(finishLoading, 1000);
+        
+        setupTutorListener();
+        speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
+        
+    } catch (err) {
+        console.error("Firebase Init Error:", err);
+        updateStatus("Offline Mode");
+        // Speak the error for debugging
+        const errMsg = err.message || "Unknown error";
+        speak(`Error: ${errMsg.substring(0, 40)}`);
+        setTimeout(finishLoading, 6000);
+    }
+}
+
+function setupTutorListener() {
+    if (!db) return;
+    db.collection("rooms").doc(roomId).onSnapshot((doc) => {
+        // Blink on data receipt
+        if (buddy) {
+            buddy.style.boxShadow = '0 0 30px #a29bfe';
+            setTimeout(() => buddy.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)', 200);
+        }
+
+        const data = doc.data();
+        if (!data) return;
+
+        if (data.requestConnect && data.status !== "connected") {
+            overlay.classList.add('visible');
+        } else if (data.status === "connected") {
+            overlay.classList.remove('visible');
+        }
+
+        if (data.status === "connected" && data.lastMessage && data.lastMessageTimestamp > (window.lastProcessedMsg || 0)) {
+            speak(data.lastMessage);
+            window.lastProcessedMsg = data.lastMessageTimestamp;
+        }
+
+        if (data.status === "connected" && data.command) {
+            handleRemoteCommand(data.command);
+            db.collection("rooms").doc(roomId).update({ command: null });
+        }
+    });
+}
+
+function handleRemoteCommand(cmd) {
+    if (cmd.type === 'wiggle') {
+        buddy.style.animation = 'wiggle 0.5s ease infinite';
+        setTimeout(() => buddy.style.animation = 'float 3s ease-in-out infinite', 2000);
+    } else if (cmd.type === 'emoji') {
+        speak(cmd.value);
+    } else if (cmd.type === 'move') {
+        ipcRenderer.send('move-window', cmd.x, cmd.y);
+    }
+}
+
+window.acceptTutor = () => {
+    db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
+    overlay.classList.remove('visible');
+    speak("Awesome! Let's get to work.");
+};
+
+window.rejectTutor = () => {
+    db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
+    overlay.classList.remove('visible');
+};
+
+// --- STARTUP ---
+document.addEventListener('DOMContentLoaded', () => {
+    speak("Hello! Just waking up...");
+    initFirebase();
 });

@@ -33,6 +33,13 @@ function createWindow() {
     const win = BrowserWindow.fromWebContents(event.sender);
     win.setIgnoreMouseEvents(ignore, options);
   });
+
+  // IPC listener to move the window
+  ipcMain.on('move-window', (event, x, y) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const [currentX, currentY] = win.getPosition();
+    win.setPosition(Math.round(currentX + x), Math.round(currentY + y));
+  });
 }
 
 app.whenReady().then(() => {
