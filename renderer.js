@@ -95,13 +95,13 @@ async function initFirebase() {
         }
 
         const firebaseConfig = {
-          apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
-          authDomain: "hackforall-hackathon.firebaseapp.com",
-          projectId: "hackforall-hackathon",
-          storageBucket: "hackforall-hackathon.firebasestorage.app",
-          messagingSenderId: "391540276748",
-          appId: "1:391540276748:web:a300ce599dbae051647829",
-          measurementId: "G-YTSKDSS1W4"
+          apiKey: "YOUR_API_KEY",
+          authDomain: "YOUR_AUTH_DOMAIN",
+          projectId: "YOUR_PROJECT_ID",
+          storageBucket: "YOUR_STORAGE_BUCKET",
+          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+          appId: "YOUR_APP_ID",
+          measurementId: "YOUR_MEASUREMENT_ID"
         };
 
         updateStatus("Connecting DB...");
