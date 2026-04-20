@@ -133,15 +133,7 @@ async function initFirebase() {
             throw new Error("Firebase CDN scripts failed to load.");
         }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
-            authDomain: "hackforall-hackathon.firebaseapp.com",
-            projectId: "hackforall-hackathon",
-            storageBucket: "hackforall-hackathon.firebasestorage.app",
-            messagingSenderId: "391540276748",
-            appId: "1:391540276748:web:8dd22d1a98684e8b647829",
-            measurementId: "G-L2N5PZC4R5"
-        };
+        const firebaseConfig = require('./firebase-config.js');
 
         updateStatus("Connecting DB...");
         firebase.initializeApp(firebaseConfig);

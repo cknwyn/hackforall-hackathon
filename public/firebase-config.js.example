@@ -1,6 +1,6 @@
-// Rename this file to firebase-config.js and add your keys
-// This file is used by the Electron (Buddy) app
-module.exports = {
+// Rename this file to firebase-config.js in this directory
+// This file is used by the Tutor Dashboard (Web App)
+const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_AUTH_DOMAIN",
   projectId: "YOUR_PROJECT_ID",
