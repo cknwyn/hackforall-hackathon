@@ -344,6 +344,54 @@ window.sendMessageUI = async () => {
 };
 
 
+// --- 6. DISTRACTION WATCHDOG LISTENER ---
+let lastWarningSpeakTime = 0;
+let distractionHeartbeat;
+
+ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
+    if (isDistracted) {
+        // Keep the Buddy in the "Angry" state (Wiggle + Red Glow)
+        if (buddy && !buddy.classList.contains('angry')) {
+            buddy.classList.add('angry');
+            
+            // Flip back to robot face if distracted while in settings
+            const container = document.getElementById('buddy-container');
+            if (container && container.classList.contains('flipped')) {
+                window.toggleControlPanel();
+            }
+        }
+        
+        // Refresh the heartbeat timeout (if we don't hear back in 4s, cool down)
+        clearTimeout(distractionHeartbeat);
+        distractionHeartbeat = setTimeout(() => {
+            if (buddy) buddy.classList.remove('angry');
+        }, 4000);
+    } else {
+        // Cool down if the main process specifically says we are not distracted
+        if (buddy) buddy.classList.remove('angry');
+    }
+});
+
+ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
+    console.log(`Watchdog: Caught user looking at ${appName}!`);
+    
+    // Throttled speech warnings
+    const now = Date.now();
+    if (now - lastWarningSpeakTime > 30000) {
+        const warnings = [
+            `Hey! Get off ${appName} and get back to work!`,
+            `I see you looking at ${appName}... Focus!`,
+            `Are we studying or are we playing on ${appName}?`,
+            `Eyes on the code, not on ${appName}! 😠`
+        ];
+        
+        const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
+        speak(randomWarning, 4000); 
+        lastWarningSpeakTime = now;
+    }
+});
+
+
 // --- STARTUP ---
 document.addEventListener('DOMContentLoaded', () => {
     speak("Hello! Just waking up...");

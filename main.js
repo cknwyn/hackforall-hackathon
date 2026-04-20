@@ -1,5 +1,9 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { exec } = require('child_process'); // Built-in Node.js module
 const path = require('path');
+
+// --- DISTRACTION WATCHDOG CONFIG ---
+const DISTRACTIONS = ['discord', 'steam', 'youtube', 'netflix', 'twitter', 'reddit', 'tiktok', 'valorant', 'league', 'roblox'];
 
 // Disable DPI scaling differences so the window doesn't physically shrink or grow across monitors
 app.commandLine.appendSwitch('high-dpi-support', '1');
@@ -28,10 +32,6 @@ function createWindow() {
 
   win.loadFile('index.html');
 
-  // Ignore mouse events initially to allow click-through
-  // but we can toggle this if we want to interact with the buddy
-  // win.setIgnoreMouseEvents(true, { forward: true });
-
   // IPC listener to toggle mouse events from the renderer
   ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -41,7 +41,6 @@ function createWindow() {
   // IPC listener to move the window (relative offset)
   ipcMain.on('move-window', (event, x, y) => {
     if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
-      console.error('Invalid move-window arguments:', x, y);
       return;
     }
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -57,6 +56,49 @@ function createWindow() {
     const win = BrowserWindow.fromWebContents(event.sender);
     win.setPosition(Math.round(targetX), Math.round(targetY));
   });
+
+  // Start the Watchdog
+  initWatchdog(win);
+}
+
+// Watchdog helper (Native PowerShell Approach - Robust Version)
+function initWatchdog(win) {
+  let lastWarningTime = 0;
+
+  // Optimized PowerShell one-liner to get ProcessName and Title as JSON
+  const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Process | Where-Object { $_.MainWindowHandle -eq (Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); }' -PassThru)::GetForegroundWindow() } | Select-Object -Property ProcessName, MainWindowTitle | ConvertTo-Json -Compress"`;
+
+  setInterval(() => {
+    exec(psCommand, (error, stdout, stderr) => {
+      if (error || !stdout) return;
+
+      try {
+        const data = JSON.parse(stdout);
+        const title = (data.MainWindowTitle || "").toLowerCase();
+        const appName = (data.ProcessName || "").toLowerCase();
+
+        // Log for debugging
+        // console.log(`Watchdog sees: [${appName}] "${title}"`);
+
+        const caughtApp = DISTRACTIONS.find(badWord => 
+          title.includes(badWord) || appName.includes(badWord)
+        );
+        
+        // Always report current state to renderer
+        win.webContents.send('distraction-state', !!caughtApp, caughtApp);
+
+        const now = Date.now();
+        if (caughtApp && (now - lastWarningTime > 30000)) {
+          console.log(`Watchdog: ALERT! Distraction detected in ${appName}: ${title}`);
+          // trigger-distraction-warning is now just for speech/text alerts
+          win.webContents.send('trigger-distraction-warning', caughtApp); 
+          lastWarningTime = now;
+        }
+      } catch (e) {
+        // Handle cases where PowerShell returns empty or invalid JSON
+      }
+    });
+  }, 3000);
 }
 
 app.whenReady().then(() => {

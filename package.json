@@ -26,6 +26,7 @@
     "firebase-tools": "^13.31.1"
   },
   "dependencies": {
+    "active-win": "^7.1.0",
     "protobufjs": "^8.0.1"
   }
 }
