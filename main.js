@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, session } = require('electron');
 const { exec } = require('child_process'); // Built-in Node.js module
 const path = require('path');
 
@@ -30,7 +30,19 @@ function createWindow() {
     },
   });
 
+  // Clear cache on every startup to prevent "stale version" issues
+  session.defaultSession.clearCache();
+
   win.loadFile('index.html');
+
+  // Reload shortcuts for development
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      if ((input.control && input.key.toLowerCase() === 'r') || input.key === 'F5') {
+        win.reload();
+      }
+    }
+  });
 
   // IPC listener to toggle mouse events from the renderer
   ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {

@@ -13,6 +13,9 @@ const text = document.getElementById('buddy-text');
 const mouth = document.getElementById('buddy-mouth');
 const buddy = document.getElementById('main-buddy');
 const physicsAnimator = document.getElementById('physics-animator');
+const antenna = document.querySelector('.antenna'); 
+const infoName = document.getElementById('info-name-display');
+const infoCode = document.getElementById('info-code-display');
 const overlay = document.getElementById('connect-overlay');
 const idBadge = document.getElementById('id-badge');
 const nameInputContainer = document.getElementById('name-input-container');
@@ -116,6 +119,7 @@ function speak(message, duration = 3000) {
 }
 
 function updateStatus(status) {
+    // Legacy support, also useful for hidden badge
     if (idBadge) {
         idBadge.innerText = status;
         idBadge.style.color = '#e17055'; 
@@ -127,7 +131,51 @@ function finishLoading() {
         idBadge.innerText = `${buddyName} | Code: ${roomId.replace('hack-', '')}`;
         idBadge.style.color = '#6c5ce7'; 
     }
+    if (infoName) infoName.innerText = buddyName;
+    if (infoCode) infoCode.innerText = roomId.replace('hack-', '');
 }
+
+window.flipBuddy = (e) => {
+    if (e) e.stopPropagation();
+    if (buddy) {
+        buddy.classList.toggle('flipped');
+        
+        const isFlipped = buddy.classList.contains('flipped');
+        const front = buddy.querySelector('.buddy-face.front');
+        const back = buddy.querySelector('.buddy-face.back');
+        
+        // Reinforce backface-visibility for shapes like triangles that break 3D rendering
+        if (front) front.style.opacity = isFlipped ? '0' : '1';
+        if (back) back.style.opacity = isFlipped ? '1' : '0';
+
+        if (isFlipped) {
+             closeRadialMenu();
+             closeBottomBar();
+        }
+    }
+};
+
+window.toggleNameInput = () => {
+    if (nameInputContainer) {
+        const isHidden = nameInputContainer.style.display === 'none' || !nameInputContainer.style.display;
+        nameInputContainer.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+            nameInput.value = buddyName;
+            setTimeout(() => nameInput.focus(), 50);
+        }
+    }
+};
+
+window.saveBuddyName = () => {
+    const newName = nameInput.value.trim();
+    if (newName) {
+        buddyName = newName;
+        localStorage.setItem('buddy-name', buddyName);
+        finishLoading();
+        nameInputContainer.style.display = 'none';
+        speak(`My name is now ${buddyName}!`);
+    }
+};
 
 // --- 4. INTERACTION LOGIC (DRAGGING) ---
 let isDragging = false;
@@ -146,8 +194,8 @@ if (physicsAnimator) {
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
-    physicsAnimator.addEventListener('dblclick', () => {
-        window.openRadialMenu('main');
+    physicsAnimator.addEventListener('dblclick', (e) => {
+        window.flipBuddy(e);
     });
 }
 
@@ -181,6 +229,7 @@ window.addEventListener('pointermove', (e) => {
 
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const overBuddy = buddy && (el === buddy || buddy.contains(el));
+    const overAntenna = el && (el.classList.contains('antenna') || el.classList.contains('antenna-tip'));
     const overBadge = idBadge && (el === idBadge || idBadge.contains(el));
     const overNameInput = nameInputContainer && (el === nameInputContainer || nameInputContainer.contains(el));
     const overRadial = radialContainer && (el === radialContainer || radialContainer.contains(el));
@@ -190,7 +239,7 @@ window.addEventListener('pointermove', (e) => {
     const overRadialBtn = el && el.closest('.radial-btn');
     const overInput = el && (el.tagName === 'INPUT' || el.tagName === 'BUTTON');
 
-    if (!overBuddy && !overBadge && !overNameInput && !overRadial && !overBottomBar && !isOverlayVisible && !overRadialBtn && !overInput && !overPhysics) {
+    if (!overBuddy && !overAntenna && !overBadge && !overNameInput && !overRadial && !overBottomBar && !isOverlayVisible && !overRadialBtn && !overInput && !overPhysics) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
@@ -205,7 +254,21 @@ async function initFirebase() {
             throw new Error("Firebase CDN scripts failed to load.");
         }
 
-        const firebaseConfig = require('./firebase-config.js');
+        let firebaseConfig;
+        try {
+            firebaseConfig = require('./firebase-config.js');
+        } catch(e) {
+            // Fallback to hardcoded dev config if file is missing
+            firebaseConfig = {
+                apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
+                authDomain: "hackforall-hackathon.firebaseapp.com",
+                projectId: "hackforall-hackathon",
+                storageBucket: "hackforall-hackathon.firebasestorage.app",
+                messagingSenderId: "391540276748",
+                appId: "1:391540276748:web:8dd22d1a98684e8b647829",
+                measurementId: "G-L2N5PZC4R5"
+            };
+        }
 
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
@@ -299,7 +362,8 @@ const radialMenuData = {
         { angle: 45, icon: '🖌️', action: () => openRadialMenu('customize'), color: '' },
         { angle: -45, icon: '🌐', action: () => openRadialMenu('network'), color: '' },
         { angle: 135, icon: '⚙️', action: () => openRadialMenu('settings'), color: '' },
-        { angle: -135, icon: '❌', action: () => closeRadialMenu(), color: 'btn-close' }
+        { angle: -135, icon: '🔄', action: () => window.flipBuddy(), color: 'btn-back' },
+        { angle: 180, icon: '❌', action: () => closeRadialMenu(), color: 'btn-close' }
     ],
     customize: [
         { angle: 45, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
@@ -339,9 +403,15 @@ const radialMenuData = {
     ],
     settings: [
         { angle: 135, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
-        { angle: 45, icon: '🏷️', action: () => { nameInputContainer.style.display = 'block'; closeRadialMenu(); }, color: '' },
+        { angle: 45, icon: '⏱️', action: () => openRadialMenu('pomodoro'), color: '' },
         { angle: -45, icon: '🗣️', action: () => { window.toggleVoicePreference(); closeRadialMenu(); }, color: 'btn-sky' },
         { angle: 0, icon: '🔊', action: () => openBottomBar('volume'), color: 'btn-mint' }
+    ],
+    pomodoro: [
+        { angle: 135, icon: '↩️', action: () => openRadialMenu('settings'), color: 'btn-back' },
+        { angle: 45, icon: '🍅', action: () => { window.startPomodoro(25); closeRadialMenu(); }, color: 'btn-fire' },
+        { angle: -45, icon: '☕', action: () => { window.startPomodoro(5); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: 0, icon: '⏹️', action: () => { window.stopPomodoro(); closeRadialMenu(); }, color: '' }
     ]
 };
 
@@ -440,8 +510,14 @@ window.applyHat = (hatStr) => {
 
 window.applyShape = (shape) => {
     if (!buddy) return;
+    const faces = buddy.querySelectorAll('.buddy-face');
     buddy.classList.remove('shape-circle', 'shape-square', 'shape-triangle');
-    if (shape !== 'default') buddy.classList.add(`shape-${shape}`);
+    faces.forEach(f => f.classList.remove('shape-circle', 'shape-square', 'shape-triangle'));
+    
+    if (shape !== 'default') {
+        buddy.classList.add(`shape-${shape}`);
+        faces.forEach(f => f.classList.add(`shape-${shape}`));
+    }
     localStorage.setItem('buddy-shape', shape);
 };
 
@@ -509,3 +585,53 @@ document.addEventListener('DOMContentLoaded', () => {
     speak("Hello! Just waking up...");
     setTimeout(initFirebase, 2000);
 });
+// --- POMODORO TIMER ENGINE ---
+let pomodoroInterval = null;
+let pomodoroTimeLeft = 0;
+const timerOverlay = document.getElementById('timer-overlay');
+
+window.startPomodoro = (minutes) => {
+    window.stopPomodoro();
+    pomodoroTimeLeft = minutes * 60;
+    
+    timerOverlay.style.display = 'block';
+    updateTimerDisplay();
+    
+    speak(`Starting a ${minutes} minute session. You got this!`);
+    
+    pomodoroInterval = setInterval(() => {
+        pomodoroTimeLeft--;
+        updateTimerDisplay();
+        
+        if (pomodoroTimeLeft <= 10) {
+            timerOverlay.classList.add('pulse');
+        } else {
+            timerOverlay.classList.remove('pulse');
+        }
+        
+        if (pomodoroTimeLeft <= 0) {
+            window.stopPomodoro();
+            timerOverlay.style.display = 'block';
+            timerOverlay.innerText = "DONE!";
+            speak("Time is up! Great work.");
+            if (buddy) buddy.classList.add('angry'); // Re-use wiggle/pulse animation
+            setTimeout(() => {
+                if (buddy) buddy.classList.remove('angry');
+                timerOverlay.style.display = 'none';
+            }, 5000);
+        }
+    }, 1000);
+};
+
+window.stopPomodoro = () => {
+    if (pomodoroInterval) clearInterval(pomodoroInterval);
+    pomodoroInterval = null;
+    timerOverlay.style.display = 'none';
+    timerOverlay.classList.remove('pulse');
+};
+
+function updateTimerDisplay() {
+    const mins = Math.floor(pomodoroTimeLeft / 60);
+    const secs = pomodoroTimeLeft % 60;
+    timerOverlay.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+}

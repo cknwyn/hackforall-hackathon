@@ -12,7 +12,7 @@
             --buddy-c1: #6c5ce7;
             --buddy-c2: #a29bfe;
         }
-        
+
         body {
             margin: 0;
             padding: 0;
@@ -44,14 +44,31 @@
             align-items: center;
             justify-content: center;
             animation: float 3s ease-in-out infinite;
-            transform-origin: bottom center; /* Better jelly base */
+            transform-origin: bottom center;
+            /* Better jelly base */
+            perspective: 1000px;
         }
 
-        /* The Robot Character */
         .buddy {
             position: relative;
             width: 120px;
             height: 140px;
+            pointer-events: auto;
+            cursor: grab;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .buddy.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .buddy-face {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: linear-gradient(135deg, var(--buddy-c1), var(--buddy-c2));
             border-radius: 20px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
@@ -59,19 +76,127 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            pointer-events: auto;
-            /* Make the buddy itself clickable */
-            cursor: grab;
-            transition: transform 0.1s ease-out, border-radius 0.4s ease, clip-path 0.4s ease;
+            backface-visibility: hidden;
+            transition: border-radius 0.4s ease, clip-path 0.4s ease;
+        }
+
+        .buddy-face.back {
+            transform: rotateY(180deg);
+            background: linear-gradient(135deg, var(--buddy-c1), var(--buddy-c2));
+            color: white;
+            padding: 15px 10px;
+            box-sizing: border-box;
+            justify-content: flex-end; /* Move content down to avoid triangle peak */
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            gap: 2px;
+        }
+
+        .buddy-face.back h4 {
+            margin: 0;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+        .buddy-face.back .info-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+        }
+
+        .buddy-face.back .info-code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 5px;
+            color: white;
+        }
+
+        #timer-overlay {
+            position: absolute;
+            top: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-family: 'Segoe UI Semibold', sans-serif;
+            font-size: 14px;
+            display: none; /* Shown when active */
+            z-index: 1000;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        #timer-overlay.pulse {
+            animation: timer-pulse 1s infinite alternate;
+            color: #ff7675;
+            border-color: #ff7675;
+        }
+
+        @keyframes timer-pulse {
+            from { transform: translateX(-50%) scale(1); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
+            to { transform: translateX(-50%) scale(1.1); box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5); }
+        }
+
+        #timer-overlay {
+            position: absolute;
+            top: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-family: 'Segoe UI Semibold', sans-serif;
+            font-size: 14px;
+            display: none; /* Shown when active */
+            z-index: 1000;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        #timer-overlay.pulse {
+            animation: timer-pulse 1s infinite alternate;
+            color: #ff7675;
+            border-color: #ff7675;
+        }
+
+        @keyframes timer-pulse {
+            from { transform: translateX(-50%) scale(1); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
+            to { transform: translateX(-50%) scale(1.1); box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5); }
         }
 
         /* Shape Customizations */
-        .buddy.shape-circle { border-radius: 50%; }
-        .buddy.shape-square { border-radius: 5px; }
-        .buddy.shape-triangle { 
+        .buddy.shape-circle, .buddy.shape-circle .buddy-face { border-radius: 50%; }
+        .buddy.shape-square, .buddy.shape-square .buddy-face { border-radius: 5px; }
+        
+        /* Triangle only clips the front face; the back becomes a rectangular info panel */
+        .buddy.shape-triangle .buddy-face.front { 
             clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
             border-radius: 0;
+        }
+        .buddy.shape-triangle .buddy-face.back {
+            border-radius: 10px; /* Data card style */
+            clip-path: none;
+        }
+        .buddy.shape-triangle {
             box-shadow: none; /* Shadow breaks on clip path */
+            border-radius: 0;
+            clip-path: none; /* Container must be rectangular to show back face */
         }
 
         .buddy:active {
@@ -84,19 +209,19 @@
             background: linear-gradient(135deg, #ff4757, #ff6b81) !important;
         }
 
-        .buddy::before {
-            /* Head antenna */
-            content: '';
+        .antenna {
             position: absolute;
             top: -15px;
             width: 4px;
             height: 15px;
             background: #6c5ce7;
+            z-index: 5;
+            cursor: pointer;
+            pointer-events: auto;
+            backface-visibility: hidden;
         }
 
-        .buddy::after {
-            /* Head antenna tip */
-            content: '';
+        .antenna-tip {
             position: absolute;
             top: -22px;
             width: 10px;
@@ -104,6 +229,10 @@
             background: #e17055;
             border-radius: 50%;
             animation: blink-light 1s infinite alternate;
+            z-index: 6;
+            cursor: pointer;
+            pointer-events: auto;
+            backface-visibility: hidden;
         }
 
         .eyes {
@@ -190,7 +319,8 @@
         /* Speech Bubble */
         .bubble {
             position: absolute;
-            bottom: 280px; /* Shifted higher up to clear the buddy */
+            bottom: 280px;
+            /* Shifted higher up to clear the buddy */
             background: white;
             padding: 15px;
             border-radius: 15px;
@@ -199,8 +329,10 @@
             opacity: 0;
             transform: translateY(10px);
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none; /* Do not block clicks */
-            z-index: 9998; /* High, but under UI badges */
+            pointer-events: none;
+            /* Do not block clicks */
+            z-index: 9998;
+            /* High, but under UI badges */
         }
 
         .bubble.visible {
@@ -237,11 +369,12 @@
             font-weight: bold;
             color: #6c5ce7;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            z-index: 9999; /* Max Priority */
+            z-index: 9999;
+            /* Max Priority */
             cursor: pointer;
             border: 1px solid #a29bfe;
             transition: all 0.2s;
-            pointer-events: auto !important; 
+            pointer-events: auto !important;
         }
 
         .id-badge:hover {
@@ -252,13 +385,21 @@
         #name-input-container {
             position: absolute;
             top: 20px;
-            z-index: 9999; /* Max Priority */
+            z-index: 9999;
+            /* Max Priority */
             display: none;
             background: white;
             border-radius: 15px;
             padding: 5px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             pointer-events: auto !important;
+            flex-direction: row;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #name-input-container.visible {
+            display: flex;
         }
 
         #name-input-container input {
@@ -400,16 +541,30 @@
             background: #ff7675;
         }
 
-        .btn-purple { background: #6c5ce7; }
-        .btn-yellow { background: #fdcb6e; color: #000; }
-        .btn-pink { background: #fd79a8; }
-        .btn-white { background: #ffffff; color: #000; border-color: #ddd; }
+        .btn-purple {
+            background: #6c5ce7;
+        }
+
+        .btn-yellow {
+            background: #fdcb6e;
+            color: #000;
+        }
+
+        .btn-pink {
+            background: #fd79a8;
+        }
+
+        .btn-white {
+            background: #ffffff;
+            color: #000;
+            border-color: #ddd;
+        }
 
         /* Hats Overlay Layer */
         .hat-layer {
             position: absolute;
             top: -55px;
-            font-size: 50px; 
+            font-size: 50px;
             z-index: 10;
             pointer-events: none;
             transition: transform 0.3s;
@@ -420,15 +575,17 @@
 
         /* Real CSS Cowboy Hat */
         .real-cowboy-hat {
-            display: none; /* Shown via JS */
+            display: none;
+            /* Shown via JS */
             width: 70px;
             height: 12px;
             background: #5d4037;
             border-radius: 5px 5px 15px 15px;
             position: relative;
             top: 40px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
         }
+
         .real-cowboy-hat::after {
             content: '';
             position: absolute;
@@ -617,27 +774,55 @@
     </div>
 
 
-    <div id="id-badge" class="id-badge" onclick="toggleNameInput()">Loading...</div>
-    <div id="name-input-container">
-        <input type="text" id="buddy-name-input" placeholder="Name your buddy..."
-            onkeypress="if(event.key==='Enter') saveBuddyName()">
-    </div>
+    <div id="id-badge" class="id-badge" style="display:none;">Loading...</div>
 
     <div class="buddy-container">
         <div id="buddy-bubble" class="bubble">
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
         </div>
         <div id="physics-animator">
+            <div id="timer-overlay">25:00</div>
             <div id="hat-overlay" class="hat-layer">
                 <span id="emoji-hat-span"></span>
                 <div id="css-cowboy-hat" class="real-cowboy-hat"></div>
             </div>
+
             <div id="main-buddy" class="buddy">
-                <div class="eyes">
-                    <div class="eye"></div>
-                    <div class="eye"></div>
+                <div class="antenna" onclick="window.flipBuddy(event)"></div>
+                <div class="antenna-tip" onclick="window.flipBuddy(event)"></div>
+
+                <!-- Front Face -->
+                <div class="buddy-face front">
+                    <div class="eyes">
+                        <div class="eye"></div>
+                        <div class="eye"></div>
+                    </div>
+                    <div id="buddy-mouth" class="mouth"></div>
                 </div>
-                <div id="buddy-mouth" class="mouth"></div>
+
+                <!-- Back Face -->
+                <div class="buddy-face back">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; margin-top:20px;">
+                        <h4 style="color:rgba(255,255,255,0.7)">Buddy Name</h4>
+                        <div id="info-name-display" class="info-name">My Buddy</div>
+                        <button class="btn-small" onclick="window.toggleNameInput()"
+                            style="padding: 2px 8px; font-size:9px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4);">EDIT</button>
+                    </div>
+
+                    <div id="name-input-container"
+                        style="position:static; box-shadow:none; padding:0; background:transparent;">
+                        <input type="text" id="buddy-name-input" placeholder="Name..."
+                            onkeypress="if(event.key==='Enter') window.saveBuddyName()"
+                            style="width:80px; font-size:10px; background:white; color:black;">
+                        <button class="btn-small" onclick="window.saveBuddyName()"
+                            style="padding: 3px 6px; background:white; color:var(--buddy-c1)">OK</button>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom: 10px;">
+                        <h4 style="color:rgba(255,255,255,0.7)">Room Code</h4>
+                        <div id="info-code-display" class="info-code">----</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
