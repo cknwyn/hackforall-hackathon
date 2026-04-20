@@ -112,13 +112,13 @@ async function initFirebase() {
         }
 
         const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
-          authDomain: "YOUR_AUTH_DOMAIN",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_STORAGE_BUCKET",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID",
-          measurementId: "YOUR_MEASUREMENT_ID"
+            apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
+            authDomain: "hackforall-hackathon.firebaseapp.com",
+            projectId: "hackforall-hackathon",
+            storageBucket: "hackforall-hackathon.firebasestorage.app",
+            messagingSenderId: "391540276748",
+            appId: "1:391540276748:web:8dd22d1a98684e8b647829",
+            measurementId: "G-L2N5PZC4R5"
         };
 
         updateStatus("Connecting DB...");
@@ -161,7 +161,7 @@ function setupTutorListener() {
         } else if (data.status === "connected") {
             overlay.classList.remove('visible');
             partnerStatus.classList.add('connected');
-            
+
             // If they connected to US, we should know their room ID to talk back
             if (data.requesterCode && !partnerRoomId) {
                 partnerRoomId = "hack-" + data.requesterCode;
@@ -199,7 +199,7 @@ function handleRemoteCommand(cmd) {
 
 window.acceptBuddyUI = () => {
     if (!requesterCode) return;
-    
+
     partnerRoomId = "hack-" + requesterCode;
     db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
     overlay.classList.remove('visible');
@@ -221,8 +221,8 @@ window.requestConnectionUI = async () => {
 
     partnerRoomId = "hack-" + friendCode;
     updateStatus("Connecting...");
-    
-    await db.collection("rooms").doc(partnerRoomId).set({ 
+
+    await db.collection("rooms").doc(partnerRoomId).set({
         requestConnect: true,
         requesterCode: roomId.replace('hack-', '') // Send our own code!
     }, { merge: true });
@@ -237,8 +237,8 @@ window.sendCommandToBuddy = async (type, payload = {}) => {
         speak("Connect to a buddy first!");
         return;
     }
-    
-    await db.collection("rooms").doc(partnerRoomId).set({ 
+
+    await db.collection("rooms").doc(partnerRoomId).set({
         command: { type, ...payload, timestamp: Date.now() }
     }, { merge: true });
 };
@@ -252,7 +252,7 @@ window.sendMessageUI = async () => {
     const msg = buddyMsgInput.value;
     if (!msg) return;
 
-    await db.collection("rooms").doc(partnerRoomId).set({ 
+    await db.collection("rooms").doc(partnerRoomId).set({
         lastMessage: msg,
         lastMessageTimestamp: Date.now(),
         status: "connected" // Ensure they stay connected
