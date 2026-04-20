@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Buddy Tutor</title>
+    <!-- Firebase CDN (Bulletproof Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         body {
             margin: 0;
@@ -12,7 +15,7 @@
             overflow: hidden;
             background: transparent;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            -webkit-app-region: drag; /* Make the whole buddy draggable */
+            user-select: none; /* Prevent text selection during drag */
         }
 
         .buddy-container {
@@ -40,7 +43,12 @@
             justify-content: center;
             animation: float 3s ease-in-out infinite;
             pointer-events: auto; /* Make the buddy itself clickable */
-            -webkit-app-region: no-drag;
+            cursor: grab;
+            transition: transform 0.1s ease-out;
+        }
+
+        .buddy:active {
+            cursor: grabbing;
         }
 
         .buddy::before { /* Head antenna */
@@ -91,6 +99,13 @@
             50% { transform: translateY(-10px); }
         }
 
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(5deg); }
+            50% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
         @keyframes blink {
             0%, 45%, 55%, 100% { transform: scaleY(1); }
             50% { transform: scaleY(0.1); }
@@ -114,7 +129,6 @@
             transform: translateY(10px);
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: auto;
-            -webkit-app-region: no-drag;
         }
 
         .bubble.visible {
@@ -139,9 +153,106 @@
             margin: 0;
             text-align: center;
         }
+
+        /* ID Badge & Naming UI */
+        .id-badge {
+            position: absolute;
+            top: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #6c5ce7;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            cursor: pointer;
+            border: 1px solid #a29bfe;
+            transition: all 0.2s;
+        }
+        .id-badge:hover { transform: scale(1.05); background: white; }
+
+        #name-input-container {
+            position: absolute;
+            top: 20px;
+            z-index: 101;
+            display: none;
+        }
+        #name-input-container input {
+            padding: 5px 10px;
+            border-radius: 10px;
+            border: 2px solid #6c5ce7;
+            font-size: 12px;
+            outline: none;
+        }
+
+        /* Connection Request UI */
+        #connect-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(108, 92, 231, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            border-radius: 20px;
+        }
+
+        #connect-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #connect-overlay p {
+            margin-bottom: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .btn-accept { background: #55efc4; color: #00b894; }
+        .btn-reject { background: #ff7675; color: white; }
+        .btn:hover { transform: scale(1.1); }
     </style>
 </head>
 <body>
+    <div id="connect-overlay">
+        <p>A tutor wants to help! Accept?</p>
+        <div class="btn-group">
+            <button class="btn btn-accept" onclick="acceptTutor()">Yes</button>
+            <button class="btn btn-reject" onclick="rejectTutor()">No</button>
+        </div>
+    </div>
+
+    <div id="id-badge" class="id-badge" onclick="toggleNameInput()">Loading...</div>
+    <div id="name-input-container">
+        <input type="text" id="buddy-name-input" placeholder="Name your buddy..." onkeypress="if(event.key==='Enter') saveBuddyName()">
+    </div>
+
     <div class="buddy-container">
         <div id="buddy-bubble" class="bubble">
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>

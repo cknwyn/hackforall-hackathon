@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "deploy": "firebase deploy --only hosting",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,6 +22,10 @@
   "homepage": "https://github.com/cknwyn/hackforall-hackathon#readme",
   "devDependencies": {
     "electron": "^41.2.1",
-    "firebase": "^12.12.0"
+    "firebase": "^12.12.0",
+    "firebase-tools": "^13.31.1"
+  },
+  "dependencies": {
+    "protobufjs": "^8.0.1"
   }
 }
