@@ -10,10 +10,10 @@ function createWindow() {
   const { width, height } = primaryDisplay.workAreaSize;
 
   const win = new BrowserWindow({
-    width: 300,
-    height: 300,
-    x: width - 350, // Bottom right corner
-    y: height - 350,
+    width: 400,
+    height: 400,
+    x: width - 450, // Bottom right corner
+    y: height - 450,
     transparent: true,
     frame: false,
     alwaysOnTop: true,

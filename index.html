@@ -11,8 +11,8 @@
         body {
             margin: 0;
             padding: 0;
-            width: 300px;
-            height: 300px;
+            width: 400px;
+            height: 400px;
             overflow: hidden;
             background: transparent;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -295,26 +295,118 @@
             transform: scale(1.1);
         }
 
-        /* Control Panel Styles */
-        #control-panel {
+        /* Radial Menu Wrappers */
+        #radial-menu-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            z-index: 400;
+        }
+
+        .radial-btn-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            pointer-events: none;
+            /* Will be translated using JS: transform: rotate(Xdeg) translateY(-100px) rotate(-Xdeg) */
+        }
+        
+        .radial-btn-wrapper.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Solid Color Buttons */
+        .radial-btn {
+            width: 50px;
+            height: 50px;
+            margin-top: -25px;
+            margin-left: -25px;
+            background: #6c5ce7;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .radial-btn:hover {
+            transform: scale(1.15);
+            background: #a29bfe;
+        }
+
+        .btn-fire { background: #d63031; }
+        .btn-mint { background: #00b894; }
+        .btn-sky { background: #0984e3; }
+        .btn-back { background: #2d3436; }
+        .btn-close { background: #ff7675; }
+
+        /* Hats Overlay Layer */
+        .hat-layer {
+            position: absolute;
+            top: -40px;
+            font-size: 40px;
+            z-index: 10;
+            pointer-events: none;
+            transition: transform 0.3s;
+        }
+
+        /* Bottom Input Bar for text tasks */
+        #bottom-input-bar {
             position: absolute;
             bottom: 20px;
             left: 20px;
             right: 20px;
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(108, 92, 231, 0.3);
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            z-index: 500;
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 10px 15px;
             display: flex;
-            flex-direction: column;
             gap: 10px;
-            transform: translateY(120%);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 500;
+            transform: translateY(150%);
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: auto;
+            align-items: center;
         }
+        
+        #bottom-input-bar.visible {
+            transform: translateY(0);
+        }
+
+        #bottom-input-bar input {
+            flex: 1;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 8px 10px;
+            outline: none;
+            font-size: 13px;
+        }
+
+        #bottom-input-bar input:focus {
+            border-color: #6c5ce7;
+        }
+
+        .bar-btn {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .bar-btn:hover { background: #5849c4; }
 
         #control-panel.visible {
             transform: translateY(0);
@@ -412,26 +504,18 @@
         </div>
     </div>
 
-    <!-- Control Panel / Menu -->
-    <div id="control-panel">
-        <h3>Buddy Controls <span id="partner-status" class="status-dot"></span></h3>
+    <!-- Radial Menu Engine -->
+    <div id="radial-menu-container">
+        <!-- Rendered completely by JS but we can place static wrappers here if we want. We'll populate dynamically in JS! -->
+    </div>
 
-        <div class="control-row">
-            <input type="text" id="partner-code-input" maxlength="4" placeholder="Partner Code">
-            <button id="connect-btn" class="btn-small" onclick="requestConnectionUI()">Connect</button>
-        </div>
-
-        <div class="control-row">
-            <input type="text" id="buddy-msg-input" placeholder="Type a message..."
-                onkeypress="if(event.key==='Enter') sendMessageUI()">
-            <button class="btn-small" onclick="sendMessageUI()">Send</button>
-        </div>
-
-        <div class="interaction-grid">
-            <button title="Wiggle" class="btn-icon" onclick="sendCommandToBuddy('wiggle')">👋</button>
-            <button title="Star" class="btn-icon" onclick="sendCommandToBuddy('emoji', {value: '🌟'})">🌟</button>
-            <button title="Idea" class="btn-icon" onclick="sendCommandToBuddy('emoji', {value: '💡'})">💡</button>
-        </div>
+    <!-- Bottom Input Bar -->
+    <div id="bottom-input-bar">
+        <!-- Re-used between Network/Settings -->
+        <span id="partner-status" class="status-dot" style="display:none;"></span>
+        <input type="text" id="dynamic-input" placeholder="...">
+        <button id="dynamic-btn" class="bar-btn">GO</button>
+        <button class="bar-btn btn-back" onclick="closeBottomBar()">❌</button>
     </div>
 
 
@@ -446,6 +530,7 @@
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
         </div>
         <div id="main-buddy" class="buddy">
+            <div id="hat-overlay" class="hat-layer"></div>
             <div class="eyes">
                 <div class="eye"></div>
                 <div class="eye"></div>
