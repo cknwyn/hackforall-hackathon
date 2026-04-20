@@ -27,19 +27,86 @@ let requesterCode = null;
 let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
+// --- 2.1 TTS STATE ---
+let voices = [];
+let selectedVoice = null;
+let voicePreference = localStorage.getItem('buddy-voice-pref') || 'male';
+
+function initTTS() {
+    const loadVoices = () => {
+        voices = window.speechSynthesis.getVoices();
+        updateSelectedVoice();
+    };
+    loadVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+}
+
+function updateSelectedVoice() {
+    const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+    // Heuristic filters for Male/Female names
+    const maleCandidates = ['david', 'mark', 'george', 'male', 'james', 'microsoft david'];
+    const femaleCandidates = ['zira', 'hazel', 'susan', 'female', 'linda', 'microsoft zira'];
+
+    const maleVoices = englishVoices.filter(v => maleCandidates.some(c => v.name.toLowerCase().includes(c)));
+    const femaleVoices = englishVoices.filter(v => femaleCandidates.some(c => v.name.toLowerCase().includes(c)));
+
+    if (voicePreference === 'male' && maleVoices.length > 0) {
+        selectedVoice = maleVoices[0];
+    } else if (voicePreference === 'female' && femaleVoices.length > 0) {
+        selectedVoice = femaleVoices[0];
+    } else {
+        selectedVoice = englishVoices[0]; // Fallback
+    }
+}
+
+window.toggleVoicePreference = () => {
+    voicePreference = voicePreference === 'male' ? 'female' : 'male';
+    localStorage.setItem('buddy-voice-pref', voicePreference);
+    updateSelectedVoice();
+    speak(`Voice updated to ${voicePreference}!`);
+};
+
+function speakVerbal(message) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(message);
+    if (selectedVoice) utterance.voice = selectedVoice;
+
+    utterance.onstart = () => {
+        if (mouth) {
+            mouth.style.height = '15px';
+            mouth.style.borderRadius = '50%';
+            mouth.style.background = '#ff7675'; // Tint red while speaking
+        }
+    };
+
+    utterance.onend = () => {
+        if (mouth) {
+            mouth.style.height = '5px';
+            mouth.style.borderRadius = '10px';
+            mouth.style.background = '#fff';
+        }
+    };
+
+    window.speechSynthesis.speak(utterance);
+}
+
 // --- 3. BASIC BUDDY FUNCTIONS (ALWAYS WORK) ---
 function speak(message, duration = 3000) {
     console.log("Buddy says:", message);
     if (!text || !bubble || !mouth) return;
+    
     text.innerText = message;
     bubble.classList.add('visible');
-    mouth.style.height = '10px';
-    mouth.style.borderRadius = '50%';
+
+    // Trigger verbal output
+    speakVerbal(message);
 
     setTimeout(() => {
         bubble.classList.remove('visible');
-        mouth.style.height = '5px';
-        mouth.style.borderRadius = '10px';
     }, duration);
 }
 
@@ -356,7 +423,8 @@ const radialMenuData = {
     ],
     settings: [
         { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
-        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' }
+        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display = 'block'; closeRadialMenu(); }, color: '' },
+        { angle: -45, icon: '🗣️', action: () => { window.toggleVoicePreference(); closeRadialMenu(); }, color: 'btn-sky' }
     ]
 };
 
@@ -454,6 +522,9 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
         if (buddy) {
             // Priority: Angry if in foreground, Suspicious if in background
             if (isForeground) {
+                if (!buddy.classList.contains('angry')) {
+                    speakVerbal("Hey!"); // Initial exclamation
+                }
                 buddy.classList.remove('suspicious');
                 buddy.classList.add('angry');
             } else {
@@ -509,6 +580,7 @@ ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => 
 
 // --- STARTUP ---
 document.addEventListener('DOMContentLoaded', () => {
+    initTTS();
     speak("Hello! Just waking up...");
     initFirebase();
 });
