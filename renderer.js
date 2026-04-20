@@ -448,42 +448,61 @@ window.applyHat = (hatStr) => {
 let lastWarningSpeakTime = 0;
 let distractionHeartbeat;
 
-ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
+ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground) => {
     if (isDistracted) {
-        // Keep the Buddy in the "Angry" state (Wiggle + Red Glow)
-        if (buddy && !buddy.classList.contains('angry')) {
-            buddy.classList.add('angry');
+        if (buddy) {
+            // Priority: Angry if in foreground, Suspicious if in background
+            if (isForeground) {
+                buddy.classList.remove('suspicious');
+                buddy.classList.add('angry');
+            } else {
+                buddy.classList.remove('angry');
+                buddy.classList.add('suspicious');
+            }
 
-            // Flip back to robot face if distracted while in settings
+            // Auto-flip back if something bad is happenning
             const container = document.getElementById('buddy-container');
             if (container && container.classList.contains('flipped')) {
                 window.toggleControlPanel();
             }
         }
 
-        // Refresh the heartbeat timeout (if we don't hear back in 4s, cool down)
         clearTimeout(distractionHeartbeat);
         distractionHeartbeat = setTimeout(() => {
-            if (buddy) buddy.classList.remove('angry');
+            if (buddy) {
+                buddy.classList.remove('angry');
+                buddy.classList.remove('suspicious');
+            }
         }, 4000);
     } else {
-        // Cool down if the main process specifically says we are not distracted
-        if (buddy) buddy.classList.remove('angry');
+        if (buddy) {
+            buddy.classList.remove('angry');
+            buddy.classList.remove('suspicious');
+        }
     }
 });
 
-ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
-    console.log(`Watchdog: Caught user looking at ${appName}!`);
+ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => {
+    console.log(`Watchdog: Caught user looking at ${appName} (Foreground: ${isForeground})`);
 
-    // Throttled speech warnings
     const now = Date.now();
     if (now - lastWarningSpeakTime > 30000) {
-        const warnings = [
-            `Hey! Get off ${appName} and get back to work!`,
-            `I see you looking at ${appName}... Focus!`,
-            `Are we studying or are we playing on ${appName}?`,
-            `Eyes on the code, not on ${appName}! 😠`
-        ];
+        let warnings = [];
+
+        if (isForeground) {
+            warnings = [
+                `Hey! Get off ${appName} and get back to work!`,
+                `I see you looking at ${appName}... Focus!`,
+                `Eyes on the code, not on ${appName}! 😠`
+            ];
+        } else {
+            warnings = [
+                `I see ${appName} running on the side... No cheating!`,
+                `Is that ${appName} I see on your other monitor? 🤨`,
+                `You might be focused here, but ${appName} is still there. Close it!`,
+                `I smell ${appName} in the background. Don't think I can't see it!`
+            ];
+        }
 
         const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
         speak(randomWarning, 4000);
