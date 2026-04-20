@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 
+// Disable DPI scaling differences so the window doesn't physically shrink or grow across monitors
+app.commandLine.appendSwitch('high-dpi-support', '1');
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
+
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
@@ -34,11 +38,24 @@ function createWindow() {
     win.setIgnoreMouseEvents(ignore, options);
   });
 
-  // IPC listener to move the window
+  // IPC listener to move the window (relative offset)
   ipcMain.on('move-window', (event, x, y) => {
+    if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
+      console.error('Invalid move-window arguments:', x, y);
+      return;
+    }
     const win = BrowserWindow.fromWebContents(event.sender);
     const [currentX, currentY] = win.getPosition();
     win.setPosition(Math.round(currentX + x), Math.round(currentY + y));
+  });
+
+  // IPC listener for absolute positioning (flawless dragging)
+  ipcMain.on('move-window-absolute', (event, targetX, targetY) => {
+    if (typeof targetX !== 'number' || typeof targetY !== 'number' || isNaN(targetX) || isNaN(targetY)) {
+      return;
+    }
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win.setPosition(Math.round(targetX), Math.round(targetY));
   });
 }
 
