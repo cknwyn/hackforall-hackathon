@@ -16,11 +16,8 @@ const overlay = document.getElementById('connect-overlay');
 const idBadge = document.getElementById('id-badge');
 const nameInputContainer = document.getElementById('name-input-container');
 const nameInput = document.getElementById('buddy-name-input');
-const controlPanel = document.getElementById('control-panel');
-const partnerCodeInput = document.getElementById('partner-code-input');
-const connectBtn = document.getElementById('connect-btn');
-const buddyMsgInput = document.getElementById('buddy-msg-input');
-const partnerStatus = document.getElementById('partner-status');
+const radialContainer = document.getElementById('radial-menu-container');
+const bottomBar = document.getElementById('bottom-input-bar');
 const connectRequestText = document.getElementById('connect-request-text');
 
 // --- 2. GLOBAL STATE ---
@@ -63,22 +60,21 @@ function finishLoading() {
 // --- 4. INTERACTION LOGIC (DRAGGING) ---
 let isDragging = false;
 let dragOffsetX = 0, dragOffsetY = 0;
+let dragMoved = false;
 
 if (buddy) {
     buddy.addEventListener('pointerdown', (e) => {
         isDragging = true;
+        dragMoved = false;
         dragOffsetX = e.clientX;
         dragOffsetY = e.clientY;
         buddy.setPointerCapture(e.pointerId);
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
-    // Double click to toggle menu
+    // Fallback double click if needed
     buddy.addEventListener('dblclick', () => {
-        controlPanel.classList.toggle('visible');
-        if (controlPanel.classList.contains('visible')) {
-            speak("How can I help?");
-        }
+        window.openRadialMenu('main');
     });
 }
 
@@ -88,10 +84,20 @@ window.addEventListener('pointerup', (e) => {
         if (buddy && buddy.hasPointerCapture(e.pointerId)) {
             buddy.releasePointerCapture(e.pointerId);
         }
+        
+        // If they didn't really move the mouse, treat as a click to open menu
+        if (!dragMoved) {
+            window.openRadialMenu('main');
+        }
     }
 });
 window.addEventListener('pointermove', (e) => {
     if (isDragging) {
+        if (Math.abs(e.clientX - dragOffsetX) > 3 || Math.abs(e.clientY - dragOffsetY) > 3) {
+            dragMoved = true;
+            closeRadialMenu(); // hide if dragging
+            closeBottomBar();
+        }
         ipcRenderer.send('move-window-absolute', e.screenX - dragOffsetX, e.screenY - dragOffsetY);
         return;
     }
@@ -100,10 +106,11 @@ window.addEventListener('pointermove', (e) => {
     const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
-    const overPanel = controlPanel && (document.elementFromPoint(e.clientX, e.clientY) === controlPanel || controlPanel.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overRadial = radialContainer && (document.elementFromPoint(e.clientX, e.clientY) === radialContainer || radialContainer.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overBottomBar = bottomBar && (document.elementFromPoint(e.clientX, e.clientY) === bottomBar || bottomBar.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const isOverlayVisible = overlay && overlay.classList.contains('visible');
 
-    if (!overBuddy && !overBubble && !overBadge && !overPanel && !isOverlayVisible) {
+    if (!overBuddy && !overBubble && !overBadge && !overRadial && !overBottomBar && !isOverlayVisible) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
@@ -178,13 +185,7 @@ function setupTutorListener() {
             overlay.classList.add('visible');
         } else if (data.status === "connected") {
             overlay.classList.remove('visible');
-            partnerStatus.classList.add('connected');
-
-            // Integrate Disconnect into the button
-            connectBtn.innerText = "Disconnect";
-            connectBtn.disabled = false;
-            connectBtn.onclick = () => window.disconnectBuddy();
-            connectBtn.style.background = "#ff7675"; // Red for disconnect
+            window.isPartnerConnected = true;
 
             // QoL: Update badge text and style
             idBadge.innerText = "Connected 🟢";
@@ -192,32 +193,24 @@ function setupTutorListener() {
             idBadge.style.background = 'white';
             idBadge.style.opacity = '1';
 
-            // QoL Tweak: Hide badge after 5 seconds for a cleaner look
             if (!window.badgeHideTimeout) {
                 window.badgeHideTimeout = setTimeout(() => {
                     idBadge.style.opacity = '0';
-                    idBadge.style.pointerEvents = 'none'; // Don't let it block clicks
+                    idBadge.style.pointerEvents = 'none';
                 }, 5000);
             }
 
-            // If they connected to US, we should know their room ID to talk back
             if (data.requesterCode && !partnerRoomId) {
                 partnerRoomId = "hack-" + data.requesterCode;
                 console.log("Partner room identified:", partnerRoomId);
             }
         } else if (data.status === "idle") {
-            // QoL: Reset everything if we go back to idle
             overlay.classList.remove('visible');
-            partnerStatus.classList.remove('connected');
+            window.isPartnerConnected = false;
+            
             idBadge.style.display = 'block';
             idBadge.style.opacity = '1';
             idBadge.style.pointerEvents = 'auto';
-
-            // Reset button to Connect mode
-            connectBtn.innerText = "Connect";
-            connectBtn.disabled = false;
-            connectBtn.onclick = () => window.requestConnectionUI();
-            connectBtn.style.background = "#6c5ce7"; // Original purple
 
             if (window.badgeHideTimeout) {
                 clearTimeout(window.badgeHideTimeout);
@@ -225,7 +218,7 @@ function setupTutorListener() {
             }
             finishLoading();
         } else {
-            partnerStatus.classList.remove('connected');
+            window.isPartnerConnected = false;
         }
 
         // 2. Incoming Messages
@@ -287,31 +280,27 @@ window.disconnectBuddy = async () => {
     }
 
     // 3. UI Cleanup
-    controlPanel.classList.remove('visible');
+    closeBottomBar();
     finishLoading();
     speak("Disconnected. Time for a break!");
 };
 
 
 // --- 6. TUTOR/BUDDY SEND COMMANDS ---
-window.requestConnectionUI = async () => {
-    const friendCode = partnerCodeInput.value.trim();
+window.requestConnectionUI = async (val) => {
+    const friendCode = val.trim();
     if (!friendCode || friendCode.length !== 4) {
-        speak("Need a 4-digit code!");
+        speak("Need 4 digits!");
         return;
     }
-
     partnerRoomId = "hack-" + friendCode;
     updateStatus("Connecting...");
-
     await db.collection("rooms").doc(partnerRoomId).set({
         requestConnect: true,
-        requesterCode: roomId.replace('hack-', '') // Send our own code!
+        requesterCode: roomId.replace('hack-', '')
     }, { merge: true });
-
     speak("Request sent!");
-    connectBtn.innerText = "Awaiting...";
-    connectBtn.disabled = true;
+    closeBottomBar();
 };
 
 window.sendCommandToBuddy = async (type, payload = {}) => {
@@ -319,30 +308,149 @@ window.sendCommandToBuddy = async (type, payload = {}) => {
         speak("Connect to a buddy first!");
         return;
     }
-
     await db.collection("rooms").doc(partnerRoomId).set({
         command: { type, ...payload, timestamp: Date.now() }
     }, { merge: true });
 };
 
-window.sendMessageUI = async () => {
+window.sendMessageUI = async (msg) => {
     if (!partnerRoomId) {
         speak("Connect first!");
         return;
     }
-
-    const msg = buddyMsgInput.value;
     if (!msg) return;
-
     await db.collection("rooms").doc(partnerRoomId).set({
         lastMessage: msg,
         lastMessageTimestamp: Date.now(),
-        status: "connected" // Ensure they stay connected
+        status: "connected"
     }, { merge: true });
-
-    buddyMsgInput.value = '';
+    closeBottomBar();
 };
 
+// --- RADIAL MENU RENDERING ENGINE ---
+const RADIAL_RADIUS = 130; // Push further out from buddy
+
+const radialMenuData = {
+    main: [
+        { angle: 45, icon: '🖌️', action: () => openRadialMenu('customize'), color: '' },
+        { angle: -45, icon: '🌐', action: () => openRadialMenu('network'), color: '' },
+        { angle: 135, icon: '⚙️', action: () => openRadialMenu('settings'), color: '' },
+        { angle: -135, icon: '❌', action: () => closeRadialMenu(), color: 'btn-close' }
+    ],
+    customize: [
+        { angle: 45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: -45, icon: '🎨', action: () => openRadialMenu('colors'), color: '' },
+        { angle: 135, icon: '🎩', action: () => openRadialMenu('hats'), color: '' }
+    ],
+    colors: [
+        { angle: -45, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: 45, icon: '🔴', action: () => { applyColor('#d63031', '#ff7675'); closeRadialMenu(); }, color: 'btn-fire' },
+        { angle: 135, icon: '🟢', action: () => { applyColor('#00b894', '#55efc4'); closeRadialMenu(); }, color: 'btn-mint' },
+        { angle: -135, icon: '🔵', action: () => { applyColor('#0984e3', '#74b9ff'); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: 0, icon: '🟣', action: () => { applyColor('#6c5ce7', '#a29bfe'); closeRadialMenu(); }, color: '' },
+    ],
+    hats: [
+        { angle: 135, icon: '🔙', action: () => openRadialMenu('customize'), color: 'btn-back' },
+        { angle: -45, icon: '🎩', action: () => { applyHat('🎩'); closeRadialMenu(); }, color: 'btn-fire' },
+        { angle: 45, icon: '👑', action: () => { applyHat('👑'); closeRadialMenu(); }, color: 'btn-sky' },
+        { angle: -135, icon: '🚫', action: () => { applyHat('none'); closeRadialMenu(); }, color: 'btn-close' }
+    ],
+    network: [
+        { angle: -45, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '🔓', action: () => openBottomBar('connect'), color: '' },
+        { angle: 135, icon: '💬', action: () => openBottomBar('message'), color: '' },
+        { angle: -135, icon: '👋', action: () => { window.sendCommandToBuddy('wiggle'); closeRadialMenu(); }, color: '' }
+    ],
+    settings: [
+        { angle: 135, icon: '🔙', action: () => openRadialMenu('main'), color: 'btn-back' },
+        { angle: 45, icon: '🏷️', action: () => { document.getElementById('name-input-container').style.display='block'; closeRadialMenu(); }, color: '' }
+    ]
+};
+
+window.openRadialMenu = (viewId) => {
+    closeBottomBar();
+    radialContainer.innerHTML = ''; // Clear prev
+    const nodes = radialMenuData[viewId];
+    if (!nodes) return;
+
+    nodes.forEach((node, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'radial-btn-wrapper';
+        
+        // Use standard Rotate/Translate to map angle easily using CSS
+        // Ensure negative numbers don't print double-minuses
+        wrapper.style.transform = `rotate(${node.angle}deg) translateY(-${RADIAL_RADIUS}px) rotate(${ -node.angle }deg)`;
+
+        const btn = document.createElement('button');
+        btn.className = `radial-btn ${node.color}`;
+        btn.innerText = node.icon;
+        btn.onclick = node.action;
+
+        wrapper.appendChild(btn);
+        radialContainer.appendChild(wrapper);
+
+        // trigger animation after a tiny delay so it pops out
+        setTimeout(() => {
+            wrapper.classList.add('active');
+        }, 10 + index * 50); // Stagger pop-out
+    });
+};
+
+window.closeRadialMenu = () => {
+    radialContainer.innerHTML = '';
+};
+
+// --- DYNAMIC BOTTOM BAR FORMS ---
+window.openBottomBar = (mode) => {
+    closeRadialMenu();
+    const input = document.getElementById('dynamic-input');
+    const btn = document.getElementById('dynamic-btn');
+    const statusDot = document.getElementById('partner-status');
+    
+    bottomBar.classList.add('visible');
+    input.value = '';
+    statusDot.style.display = 'none';
+
+    if (mode === 'connect') {
+        input.placeholder = 'Partner Code (4 Digits)';
+        input.maxLength = 4;
+        btn.innerText = 'LINK';
+        btn.onclick = () => window.requestConnectionUI(input.value);
+        if (window.isPartnerConnected) {
+            statusDot.style.display = 'inline-block';
+            statusDot.classList.add('connected');
+            btn.innerText = 'DISCONNECT';
+            btn.onclick = () => window.disconnectBuddy();
+        }
+    } else if (mode === 'message') {
+        input.placeholder = 'Type a message...';
+        input.removeAttribute('maxLength');
+        btn.innerText = 'SEND';
+        btn.onclick = () => window.sendMessageUI(input.value);
+    }
+    input.onkeypress = (e) => { if(e.key === 'Enter') btn.click(); };
+    setTimeout(() => input.focus(), 150);
+};
+
+window.closeBottomBar = () => {
+    bottomBar.classList.remove('visible');
+};
+
+// --- Customizations ---
+window.applyColor = (c1, c2) => {
+    if (buddy) buddy.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+};
+
+window.applyHat = (hatStr) => {
+    const hatOverlay = document.getElementById('hat-overlay');
+    if (hatOverlay) {
+        if (hatStr === 'none') {
+            hatOverlay.innerText = '';
+        } else {
+            hatOverlay.innerText = hatStr;
+        }
+    }
+};
 
 // --- 6. DISTRACTION WATCHDOG LISTENER ---
 let lastWarningSpeakTime = 0;
