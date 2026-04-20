@@ -9,9 +9,17 @@ const overlay = document.getElementById('connect-overlay');
 const idBadge = document.getElementById('id-badge');
 const nameInputContainer = document.getElementById('name-input-container');
 const nameInput = document.getElementById('buddy-name-input');
+const controlPanel = document.getElementById('control-panel');
+const partnerCodeInput = document.getElementById('partner-code-input');
+const connectBtn = document.getElementById('connect-btn');
+const buddyMsgInput = document.getElementById('buddy-msg-input');
+const partnerStatus = document.getElementById('partner-status');
+const connectRequestText = document.getElementById('connect-request-text');
 
 // --- 2. GLOBAL STATE ---
 let db = null;
+let partnerRoomId = null;
+let requesterCode = null;
 let buddyName = localStorage.getItem('buddy-name') || "My Buddy";
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
@@ -56,6 +64,14 @@ if (buddy) {
         mouseY = e.clientY;
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
+
+    // Double click to toggle menu
+    buddy.addEventListener('dblclick', () => {
+        controlPanel.classList.toggle('visible');
+        if (controlPanel.classList.contains('visible')) {
+            speak("How can I help?");
+        }
+    });
 }
 
 window.addEventListener('mouseup', () => isDragging = false);
@@ -64,14 +80,15 @@ window.addEventListener('mousemove', (e) => {
         ipcRenderer.send('move-window', e.clientX - mouseX, e.clientY - mouseY);
         return;
     }
-    
+
     // Check if mouse is over UI elements
     const overBuddy = buddy && (document.elementFromPoint(e.clientX, e.clientY) === buddy || buddy.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBubble = bubble && (document.elementFromPoint(e.clientX, e.clientY) === bubble || bubble.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const overBadge = idBadge && (document.elementFromPoint(e.clientX, e.clientY) === idBadge || idBadge.contains(document.elementFromPoint(e.clientX, e.clientY)));
+    const overPanel = controlPanel && (document.elementFromPoint(e.clientX, e.clientY) === controlPanel || controlPanel.contains(document.elementFromPoint(e.clientX, e.clientY)));
     const isOverlayVisible = overlay && overlay.classList.contains('visible');
 
-    if (!overBuddy && !overBubble && !overBadge && !isOverlayVisible) {
+    if (!overBuddy && !overBubble && !overBadge && !overPanel && !isOverlayVisible) {
         ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
     } else {
         ipcRenderer.send('set-ignore-mouse-events', false);
@@ -87,7 +104,7 @@ setInterval(() => {
 // --- 5. FIREBASE INITIALIZATION (SAFE MODE) ---
 async function initFirebase() {
     updateStatus("Loading Bridge...");
-    
+
     try {
         // Use global 'firebase' from the CDN script
         if (typeof firebase === 'undefined') {
@@ -102,10 +119,10 @@ async function initFirebase() {
 
         updateStatus("Ready!");
         setTimeout(finishLoading, 1000);
-        
+
         setupTutorListener();
         speak(`I'm connected! My code is ${roomId.replace('hack-', '')}`);
-        
+
     } catch (err) {
         console.error("Firebase Init Error:", err);
         updateStatus("Offline Mode");
@@ -128,23 +145,38 @@ function setupTutorListener() {
         const data = doc.data();
         if (!data) return;
 
+        // 1. Connection Request Logic
         if (data.requestConnect && data.status !== "connected") {
+            requesterCode = data.requesterCode;
+            connectRequestText.innerText = `Buddy ${requesterCode} wants to connect!`;
             overlay.classList.add('visible');
         } else if (data.status === "connected") {
             overlay.classList.remove('visible');
+            partnerStatus.classList.add('connected');
+            
+            // If they connected to US, we should know their room ID to talk back
+            if (data.requesterCode && !partnerRoomId) {
+                partnerRoomId = "hack-" + data.requesterCode;
+                console.log("Partner room identified:", partnerRoomId);
+            }
+        } else {
+            partnerStatus.classList.remove('connected');
         }
 
+        // 2. Incoming Messages
         if (data.status === "connected" && data.lastMessage && data.lastMessageTimestamp > (window.lastProcessedMsg || 0)) {
             speak(data.lastMessage);
             window.lastProcessedMsg = data.lastMessageTimestamp;
         }
 
+        // 3. Remote Commands
         if (data.status === "connected" && data.command) {
             handleRemoteCommand(data.command);
             db.collection("rooms").doc(roomId).update({ command: null });
         }
     });
 }
+
 
 function handleRemoteCommand(cmd) {
     if (cmd.type === 'wiggle') {
@@ -157,16 +189,70 @@ function handleRemoteCommand(cmd) {
     }
 }
 
-window.acceptTutor = () => {
+window.acceptBuddyUI = () => {
+    if (!requesterCode) return;
+    
+    partnerRoomId = "hack-" + requesterCode;
     db.collection("rooms").doc(roomId).update({ status: "connected", requestConnect: false });
     overlay.classList.remove('visible');
-    speak("Awesome! Let's get to work.");
+    speak("We're connected!");
 };
 
 window.rejectTutor = () => {
     db.collection("rooms").doc(roomId).update({ status: "idle", requestConnect: false });
     overlay.classList.remove('visible');
 };
+
+// --- 6. TUTOR/BUDDY SEND COMMANDS ---
+window.requestConnectionUI = async () => {
+    const friendCode = partnerCodeInput.value.trim();
+    if (!friendCode || friendCode.length !== 4) {
+        speak("Need a 4-digit code!");
+        return;
+    }
+
+    partnerRoomId = "hack-" + friendCode;
+    updateStatus("Connecting...");
+    
+    await db.collection("rooms").doc(partnerRoomId).set({ 
+        requestConnect: true,
+        requesterCode: roomId.replace('hack-', '') // Send our own code!
+    }, { merge: true });
+
+    speak("Request sent!");
+    connectBtn.innerText = "Awaiting...";
+    connectBtn.disabled = true;
+};
+
+window.sendCommandToBuddy = async (type, payload = {}) => {
+    if (!partnerRoomId) {
+        speak("Connect to a buddy first!");
+        return;
+    }
+    
+    await db.collection("rooms").doc(partnerRoomId).set({ 
+        command: { type, ...payload, timestamp: Date.now() }
+    }, { merge: true });
+};
+
+window.sendMessageUI = async () => {
+    if (!partnerRoomId) {
+        speak("Connect first!");
+        return;
+    }
+
+    const msg = buddyMsgInput.value;
+    if (!msg) return;
+
+    await db.collection("rooms").doc(partnerRoomId).set({ 
+        lastMessage: msg,
+        lastMessageTimestamp: Date.now(),
+        status: "connected" // Ensure they stay connected
+    }, { merge: true });
+
+    buddyMsgInput.value = '';
+};
+
 
 // --- STARTUP ---
 document.addEventListener('DOMContentLoaded', () => {
