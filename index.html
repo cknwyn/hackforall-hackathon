@@ -70,7 +70,8 @@
             position: relative;
         }
 
-        .buddy.dead .eye::before, .buddy.dead .eye::after {
+        .buddy.dead .eye::before,
+        .buddy.dead .eye::after {
             content: '';
             position: absolute;
             top: 50%;
@@ -112,7 +113,8 @@
             color: white;
             padding: 15px 10px;
             box-sizing: border-box;
-            justify-content: flex-end; /* Move content down to avoid triangle peak */
+            justify-content: flex-end;
+            /* Move content down to avoid triangle peak */
             border: 2px solid rgba(255, 255, 255, 0.3);
             gap: 2px;
         }
@@ -154,7 +156,8 @@
             border-radius: 15px;
             font-family: 'Segoe UI Semibold', sans-serif;
             font-size: 14px;
-            display: none; /* Shown when active */
+            display: none;
+            /* Shown when active */
             z-index: 1000;
             white-space: nowrap;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
@@ -170,8 +173,15 @@
         }
 
         @keyframes timer-pulse {
-            from { transform: translateX(-50%) scale(1); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
-            to { transform: translateX(-50%) scale(1.1); box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5); }
+            from {
+                transform: translateX(-50%) scale(1);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            }
+
+            to {
+                transform: translateX(-50%) scale(1.1);
+                box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5);
+            }
         }
 
         #timer-overlay {
@@ -186,7 +196,8 @@
             border-radius: 15px;
             font-family: 'Segoe UI Semibold', sans-serif;
             font-size: 14px;
-            display: none; /* Shown when active */
+            display: none;
+            /* Shown when active */
             z-index: 1000;
             white-space: nowrap;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
@@ -202,27 +213,46 @@
         }
 
         @keyframes timer-pulse {
-            from { transform: translateX(-50%) scale(1); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
-            to { transform: translateX(-50%) scale(1.1); box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5); }
+            from {
+                transform: translateX(-50%) scale(1);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            }
+
+            to {
+                transform: translateX(-50%) scale(1.1);
+                box-shadow: 0 4px 25px rgba(255, 118, 117, 0.5);
+            }
         }
 
         /* Shape Customizations */
-        .buddy.shape-circle, .buddy.shape-circle .buddy-face { border-radius: 50%; }
-        .buddy.shape-square, .buddy.shape-square .buddy-face { border-radius: 5px; }
-        
+        .buddy.shape-circle,
+        .buddy.shape-circle .buddy-face {
+            border-radius: 50%;
+        }
+
+        .buddy.shape-square,
+        .buddy.shape-square .buddy-face {
+            border-radius: 5px;
+        }
+
         /* Triangle only clips the front face; the back becomes a rectangular info panel */
-        .buddy.shape-triangle .buddy-face.front { 
+        .buddy.shape-triangle .buddy-face.front {
             clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
             border-radius: 0;
         }
+
         .buddy.shape-triangle .buddy-face.back {
-            border-radius: 10px; /* Data card style */
+            border-radius: 10px;
+            /* Data card style */
             clip-path: none;
         }
+
         .buddy.shape-triangle {
-            box-shadow: none; /* Shadow breaks on clip path */
+            box-shadow: none;
+            /* Shadow breaks on clip path */
             border-radius: 0;
-            clip-path: none; /* Container must be rectangular to show back face */
+            clip-path: none;
+            /* Container must be rectangular to show back face */
         }
 
         .buddy:active {
@@ -298,8 +328,15 @@
 
         /* Animations */
         @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         .dead #physics-animator {
@@ -308,19 +345,49 @@
         }
 
         @keyframes vibrate {
-            0% { transform: translate(0); }
-            20% { transform: translate(-1px, 1px); }
-            40% { transform: translate(-1px, -1px); }
-            60% { transform: translate(1px, 1px); }
-            80% { transform: translate(1px, -1px); }
-            100% { transform: translate(0); }
+            0% {
+                transform: translate(0);
+            }
+
+            20% {
+                transform: translate(-1px, 1px);
+            }
+
+            40% {
+                transform: translate(-1px, -1px);
+            }
+
+            60% {
+                transform: translate(1px, 1px);
+            }
+
+            80% {
+                transform: translate(1px, -1px);
+            }
+
+            100% {
+                transform: translate(0);
+            }
         }
 
         @keyframes wiggle {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(2deg); }
-            50% { transform: rotate(-2deg); }
-            75% { transform: rotate(2deg); }
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(2deg);
+            }
+
+            50% {
+                transform: rotate(-2deg);
+            }
+
+            75% {
+                transform: rotate(2deg);
+            }
         }
 
         @keyframes blink {
@@ -835,9 +902,10 @@
 
                 <!-- Back Face -->
                 <div class="buddy-face back">
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; margin-top:20px;">
-                        <h4 style="color:rgba(255,255,255,0.7)">Buddy Name</h4>
-                        <div id="info-name-display" class="info-name">My Buddy</div>
+                    <div
+                        style="display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; margin-top:20px;">
+                        <h4 style="color:rgba(255,255,255,0.7)">Tropa's Name</h4>
+                        <div id="info-name-display" class="info-name">My Tropa</div>
                         <button class="btn-small" onclick="window.toggleNameInput()"
                             style="padding: 2px 8px; font-size:9px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4);">EDIT</button>
                     </div>
@@ -852,7 +920,7 @@
                     </div>
 
                     <div style="display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom: 10px;">
-                        <h4 style="color:rgba(255,255,255,0.7)">Room Code</h4>
+                        <h4 style="color:rgba(255,255,255,0.7)">TROPA CODE</h4>
                         <div id="info-code-display" class="info-code">----</div>
                     </div>
                 </div>
