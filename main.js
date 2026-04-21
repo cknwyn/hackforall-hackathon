@@ -3,7 +3,7 @@ const { exec } = require('child_process'); // Built-in Node.js module
 const path = require('path');
 
 // --- DISTRACTION WATCHDOG CONFIG ---
-const DISTRACTIONS = ['discord', 'steam', 'youtube', 'netflix', 'twitter', 'reddit', 'tiktok', 'valorant', 'league', 'roblox'];
+const DISTRACTIONS = ['discord', 'steam', 'youtube', 'netflix', 'twitter', 'reddit', 'tiktok', 'valorant', 'league', 'roblox', 'instagram'];
 
 // Disable DPI scaling differences so the window doesn't physically shrink or grow across monitors
 app.commandLine.appendSwitch('high-dpi-support', '1');

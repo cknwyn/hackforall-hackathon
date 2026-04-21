@@ -23,7 +23,8 @@ const nameInput = document.getElementById('buddy-name-input');
 const radialContainer = document.getElementById('radial-menu-container');
 const bottomBar = document.getElementById('bottom-input-bar');
 const connectRequestText = document.getElementById('connect-request-text');
-
+const angrySound = new Audio('alert.mp3'); // Ensure this matches your file name
+angrySound.volume = 0.8;
 // --- 2. GLOBAL STATE ---
 let db = null;
 let partnerRoomId = null;
@@ -34,6 +35,9 @@ let buddyHat = localStorage.getItem('buddy-hat') || 'none';
 let buddyShape = localStorage.getItem('buddy-shape') || 'default';
 let isDead = false;
 let distractionStartTime = null;
+let wasDistracted = false; // Track previous state to play sound only once
+const DEATH_THRESHOLD = 30000; // 30 seconds to "die"
+
 const roomId = "hack-" + Math.floor(1000 + Math.random() * 9000);
 
 // --- 2.1 TTS STATE ---
@@ -552,6 +556,21 @@ let distractionHeartbeat;
 
 ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
     if (isDistracted) {
+        if (isDead) return; // Don't track if already dead
+
+        if (!wasDistracted) {
+            angrySound.play().catch(e => console.error("Audio play failed:", e));
+            distractionStartTime = Date.now();
+        }
+        wasDistracted = true;
+
+        // Check for persistent distraction
+        const duration = Date.now() - distractionStartTime;
+        if (duration > DEATH_THRESHOLD) {
+            die();
+            return;
+        }
+
         if (buddy) {
             // Since the watchdog only checks active windows, it's always an active distraction!
             buddy.classList.remove('suspicious'); // Clean up just in case
@@ -568,6 +587,8 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
             if (buddy) buddy.classList.remove('angry');
         }, 4000);
     } else {
+        wasDistracted = false;
+        distractionStartTime = null; // Reset on focus
         // Cool down if the main process specifically says we are not distracted
         if (buddy) buddy.classList.remove('angry');
     }
@@ -587,6 +608,7 @@ ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
 
         const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
         speak(randomWarning, 4000);
+        angrySound.play().catch(e => console.error("Audio play failed:", e));
         lastWarningSpeakTime = now;
     }
 });
@@ -632,6 +654,7 @@ window.startPomodoro = (minutes) => {
             timerOverlay.style.display = 'block';
             timerOverlay.innerText = "DONE!";
             speak("Time is up! Great work.");
+            angrySound.play().catch(e => console.error("Audio play failed:", e));
             if (buddy) buddy.classList.add('angry'); // Re-use wiggle/pulse animation
             setTimeout(() => {
                 if (buddy) buddy.classList.remove('angry');
