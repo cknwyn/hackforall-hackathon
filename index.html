@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>Buddy Tutor</title>
@@ -15,7 +16,8 @@
             overflow: hidden;
             background: transparent;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            user-select: none; /* Prevent text selection during drag */
+            user-select: none;
+            /* Prevent text selection during drag */
         }
 
         .buddy-container {
@@ -26,7 +28,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            pointer-events: none; /* Let clicks pass through empty space */
+            pointer-events: none;
+            /* Let clicks pass through empty space */
         }
 
         /* The Robot Character */
@@ -36,13 +39,14 @@
             height: 140px;
             background: linear-gradient(135deg, #6c5ce7, #a29bfe);
             border-radius: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             animation: float 3s ease-in-out infinite;
-            pointer-events: auto; /* Make the buddy itself clickable */
+            pointer-events: auto;
+            /* Make the buddy itself clickable */
             cursor: grab;
             transition: transform 0.1s ease-out;
         }
@@ -51,7 +55,8 @@
             cursor: grabbing;
         }
 
-        .buddy::before { /* Head antenna */
+        .buddy::before {
+            /* Head antenna */
             content: '';
             position: absolute;
             top: -15px;
@@ -60,7 +65,8 @@
             background: #6c5ce7;
         }
 
-        .buddy::after { /* Head antenna tip */
+        .buddy::after {
+            /* Head antenna tip */
             content: '';
             position: absolute;
             top: -22px;
@@ -95,25 +101,61 @@
 
         /* Animations */
         @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         @keyframes wiggle {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(5deg); }
-            50% { transform: rotate(-5deg); }
-            75% { transform: rotate(5deg); }
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(5deg);
+            }
+
+            50% {
+                transform: rotate(-5deg);
+            }
+
+            75% {
+                transform: rotate(5deg);
+            }
         }
 
         @keyframes blink {
-            0%, 45%, 55%, 100% { transform: scaleY(1); }
-            50% { transform: scaleY(0.1); }
+
+            0%,
+            45%,
+            55%,
+            100% {
+                transform: scaleY(1);
+            }
+
+            50% {
+                transform: scaleY(0.1);
+            }
         }
 
         @keyframes blink-light {
-            from { background: #e17055; box-shadow: 0 0 5px #e17055; }
-            to { background: #fab1a0; box-shadow: 0 0 15px #ff7675; }
+            from {
+                background: #e17055;
+                box-shadow: 0 0 5px #e17055;
+            }
+
+            to {
+                background: #fab1a0;
+                box-shadow: 0 0 15px #ff7675;
+            }
         }
 
         /* Speech Bubble */
@@ -123,7 +165,7 @@
             background: white;
             padding: 15px;
             border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             max-width: 200px;
             opacity: 0;
             transform: translateY(10px);
@@ -164,13 +206,17 @@
             font-size: 11px;
             font-weight: bold;
             color: #6c5ce7;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             z-index: 100;
             cursor: pointer;
             border: 1px solid #a29bfe;
             transition: all 0.2s;
         }
-        .id-badge:hover { transform: scale(1.05); background: white; }
+
+        .id-badge:hover {
+            transform: scale(1.05);
+            background: white;
+        }
 
         #name-input-container {
             position: absolute;
@@ -178,6 +224,7 @@
             z-index: 101;
             display: none;
         }
+
         #name-input-container input {
             padding: 5px 10px;
             border-radius: 10px;
@@ -234,11 +281,22 @@
             transition: transform 0.2s;
         }
 
-        .btn-accept { background: #55efc4; color: #00b894; }
-        .btn-reject { background: #ff7675; color: white; }
-        .btn:hover { transform: scale(1.1); }
+        .btn-accept {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .btn-reject {
+            background: #ff7675;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: scale(1.1);
+        }
     </style>
 </head>
+
 <body>
     <div id="connect-overlay">
         <p>A tutor wants to help! Accept?</p>
@@ -250,22 +308,63 @@
 
     <div id="id-badge" class="id-badge" onclick="toggleNameInput()">Loading...</div>
     <div id="name-input-container">
-        <input type="text" id="buddy-name-input" placeholder="Name your buddy..." onkeypress="if(event.key==='Enter') saveBuddyName()">
+        <input type="text" id="buddy-name-input" placeholder="Name your buddy..."
+            onkeypress="if(event.key==='Enter') saveBuddyName()">
     </div>
 
     <div class="buddy-container">
         <div id="buddy-bubble" class="bubble">
             <p id="buddy-text" class="message">Hi! I'm your tutor buddy!</p>
         </div>
-        <div id="main-buddy" class="buddy">
-            <div class="eyes">
-                <div class="eye"></div>
-                <div class="eye"></div>
+        <div id="physics-animator">
+            <div id="timer-overlay">25:00</div>
+            <div id="hat-overlay" class="hat-layer">
+                <span id="emoji-hat-span"></span>
+                <div id="css-cowboy-hat" class="real-cowboy-hat"></div>
             </div>
-            <div id="buddy-mouth" class="mouth"></div>
+
+            <div id="main-buddy" class="buddy">
+                <div class="antenna" onclick="window.flipBuddy(event)"></div>
+                <div class="antenna-tip" onclick="window.flipBuddy(event)"></div>
+
+                <!-- Front Face -->
+                <div class="buddy-face front">
+                    <div class="eyes">
+                        <div class="eye"></div>
+                        <div class="eye"></div>
+                    </div>
+                    <div id="buddy-mouth" class="mouth"></div>
+                </div>
+
+                <!-- Back Face -->
+                <div class="buddy-face back">
+                    <div
+                        style="display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; margin-top:20px;">
+                        <h4 style="color:rgba(255,255,255,0.7)">Tropa's Name</h4>
+                        <div id="info-name-display" class="info-name">My Tropa</div>
+                        <button class="btn-small" onclick="window.toggleNameInput()"
+                            style="padding: 2px 8px; font-size:9px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4);">EDIT</button>
+                    </div>
+
+                    <div id="name-input-container"
+                        style="position:static; box-shadow:none; padding:0; background:transparent;">
+                        <input type="text" id="buddy-name-input" placeholder="Name..."
+                            onkeypress="if(event.key==='Enter') window.saveBuddyName()"
+                            style="width:80px; font-size:10px; background:white; color:black;">
+                        <button class="btn-small" onclick="window.saveBuddyName()"
+                            style="padding: 3px 6px; background:white; color:var(--buddy-c1)">OK</button>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom: 10px;">
+                        <h4 style="color:rgba(255,255,255,0.7)">TROPA CODE</h4>
+                        <div id="info-code-display" class="info-code">----</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="renderer.js"></script>
 </body>
+
 </html>
