@@ -13,7 +13,7 @@ const text = document.getElementById('buddy-text');
 const mouth = document.getElementById('buddy-mouth');
 const buddy = document.getElementById('main-buddy');
 const physicsAnimator = document.getElementById('physics-animator');
-const antenna = document.querySelector('.antenna'); 
+const antenna = document.querySelector('.antenna');
 const infoName = document.getElementById('info-name-display');
 const infoCode = document.getElementById('info-code-display');
 const overlay = document.getElementById('connect-overlay');
@@ -108,7 +108,7 @@ function speakVerbal(message) {
 function speak(message, duration = 3000) {
     console.log("Buddy says:", message);
     if (!text || !bubble || !mouth) return;
-    
+
     text.innerText = message;
     bubble.classList.add('visible');
 
@@ -124,14 +124,14 @@ function updateStatus(status) {
     // Legacy support, also useful for hidden badge
     if (idBadge) {
         idBadge.innerText = status;
-        idBadge.style.color = '#e17055'; 
+        idBadge.style.color = '#e17055';
     }
 }
 
 function finishLoading() {
     if (idBadge) {
         idBadge.innerText = `${buddyName} | Code: ${roomId.replace('hack-', '')}`;
-        idBadge.style.color = '#6c5ce7'; 
+        idBadge.style.color = '#6c5ce7';
     }
     if (infoName) infoName.innerText = buddyName;
     if (infoCode) infoCode.innerText = roomId.replace('hack-', '');
@@ -141,18 +141,18 @@ window.flipBuddy = (e) => {
     if (e) e.stopPropagation();
     if (buddy) {
         buddy.classList.toggle('flipped');
-        
+
         const isFlipped = buddy.classList.contains('flipped');
         const front = buddy.querySelector('.buddy-face.front');
         const back = buddy.querySelector('.buddy-face.back');
-        
+
         // Reinforce backface-visibility for shapes like triangles that break 3D rendering
         if (front) front.style.opacity = isFlipped ? '0' : '1';
         if (back) back.style.opacity = isFlipped ? '1' : '0';
 
         if (isFlipped) {
-             closeRadialMenu();
-             closeBottomBar();
+            closeRadialMenu();
+            closeBottomBar();
         }
     }
 };
@@ -191,8 +191,8 @@ if (physicsAnimator) {
         dragOffsetX = e.clientX;
         dragOffsetY = e.clientY;
         physicsAnimator.setPointerCapture(e.pointerId);
-        
-        physicsAnimator.style.animation = 'none'; 
+
+        physicsAnimator.style.animation = 'none';
         ipcRenderer.send('set-ignore-mouse-events', false);
     });
 
@@ -226,7 +226,7 @@ window.addEventListener('pointerup', (e) => {
         if (physicsAnimator && physicsAnimator.hasPointerCapture(e.pointerId)) {
             physicsAnimator.releasePointerCapture(e.pointerId);
         }
-        
+
         if (physicsAnimator) {
             physicsAnimator.style.animation = 'float 3s ease-in-out infinite';
         }
@@ -282,7 +282,7 @@ async function initFirebase() {
         let firebaseConfig;
         try {
             firebaseConfig = require('./firebase-config.js');
-        } catch(e) {
+        } catch (e) {
             // Fallback to hardcoded dev config if file is missing
             firebaseConfig = {
                 apiKey: "AIzaSyDlz91QUyZ3u5jIOBvuL3FeNW-F3fcdi1Y",
@@ -419,7 +419,7 @@ const radialMenuData = {
         { angle: -45, icon: '🔺', action: () => { applyShape('triangle'); closeRadialMenu(); }, color: '' },
         { angle: 45, icon: '🔵', action: () => { applyShape('circle'); closeRadialMenu(); }, color: '' },
         { angle: 135, icon: '⬛', action: () => { applyShape('square'); closeRadialMenu(); }, color: '' },
-        { angle: 0, icon: '🟦', action: () => { applyShape('default'); closeRadialMenu(); }, color: '' } 
+        { angle: 0, icon: '🟦', action: () => { applyShape('default'); closeRadialMenu(); }, color: '' }
     ],
     network: [
         { angle: -45, icon: '↩️', action: () => openRadialMenu('main'), color: 'btn-back' },
@@ -471,7 +471,7 @@ window.openBottomBar = (mode) => {
 
     bottomBar.classList.add('visible');
     input.value = '';
-    
+
     // Default visibility
     input.style.display = 'block';
     slider.style.display = 'none';
@@ -494,10 +494,10 @@ window.openBottomBar = (mode) => {
         slider.value = voiceVolume;
         btn.innerText = 'OK';
         btn.onclick = () => {
-             voiceVolume = parseFloat(slider.value);
-             localStorage.setItem('buddy-voice-volume', voiceVolume);
-             speak(`Volume: ${Math.round(voiceVolume * 100)}%`);
-             closeBottomBar();
+            voiceVolume = parseFloat(slider.value);
+            localStorage.setItem('buddy-voice-volume', voiceVolume);
+            speak(`Volume: ${Math.round(voiceVolume * 100)}%`);
+            closeBottomBar();
         };
         slider.oninput = () => { voiceVolume = parseFloat(slider.value); };
     }
@@ -517,7 +517,7 @@ window.applyColor = (c1, c2) => {
 window.applyHat = (hatStr) => {
     const emojiSpan = document.getElementById('emoji-hat-span');
     const cssCowboyHat = document.getElementById('css-cowboy-hat');
-    
+
     if (emojiSpan && cssCowboyHat) {
         emojiSpan.innerText = '';
         cssCowboyHat.style.display = 'none';
@@ -538,7 +538,7 @@ window.applyShape = (shape) => {
     const faces = buddy.querySelectorAll('.buddy-face');
     buddy.classList.remove('shape-circle', 'shape-square', 'shape-triangle');
     faces.forEach(f => f.classList.remove('shape-circle', 'shape-square', 'shape-triangle'));
-    
+
     if (shape !== 'default') {
         buddy.classList.add(`shape-${shape}`);
         faces.forEach(f => f.classList.add(`shape-${shape}`));
@@ -550,30 +550,16 @@ window.applyShape = (shape) => {
 let lastWarningSpeakTime = 0;
 let distractionHeartbeat;
 
-ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground) => {
+ipcRenderer.on('distraction-state', (event, isDistracted, appName) => {
     if (isDistracted) {
         if (buddy) {
-            if (isForeground) {
-                if (!buddy.classList.contains('angry')) {
-                    speakVerbal("Hey!"); 
-                }
-                buddy.classList.remove('suspicious');
-                buddy.classList.add('angry');
-            } else {
-                buddy.classList.remove('angry');
-                buddy.classList.add('suspicious');
-            }
+            // Since the watchdog only checks active windows, it's always an active distraction!
+            buddy.classList.remove('suspicious'); // Clean up just in case
+            buddy.classList.add('angry');
 
-            // --- 6.1 DEATH TIMER LOGIC ---
-            if (!isDead) {
-                if (!distractionStartTime) {
-                    distractionStartTime = Date.now();
-                } else {
-                    const elapsed = Date.now() - distractionStartTime;
-                    if (elapsed > 60000) {
-                        die();
-                    }
-                }
+            // Auto-flip back if something bad is happenning (using flipBuddy instead of non-existent toggleControlPanel)
+            if (buddy && buddy.classList.contains('flipped')) {
+                window.flipBuddy();
             }
         }
 
@@ -582,28 +568,23 @@ ipcRenderer.on('distraction-state', (event, isDistracted, appName, isForeground)
             if (buddy) buddy.classList.remove('angry');
         }, 4000);
     } else {
+        // Cool down if the main process specifically says we are not distracted
         if (buddy) buddy.classList.remove('angry');
     }
 });
 
-ipcRenderer.on('trigger-distraction-warning', (event, appName, isForeground) => {
+ipcRenderer.on('trigger-distraction-warning', (event, appName) => {
+    console.log(`Watchdog: Caught user looking at ${appName}`);
+
     const now = Date.now();
     if (now - lastWarningSpeakTime > 30000) {
-        let warnings = [];
-        if (isForeground) {
-            warnings = [
-                `Hey! Get off ${appName} and get back to work!`,
-                `I see you looking at ${appName}... Focus!`,
-                `Eyes on the code, not on ${appName}! 😠`
-            ];
-        } else {
-            warnings = [
-                `I see ${appName} running on the side... No cheating!`,
-                `Is that ${appName} I see on your other monitor? 🤨`,
-                `You might be focused here, but ${appName} is still there. Close it!`,
-                `I smell ${appName} in the background. Don't think I can't see it!`
-            ];
-        }
+        // All caught distractions are currently foreground distractions
+        const warnings = [
+            `Hey! Get off ${appName} and get back to work!`,
+            `I see you looking at ${appName}... Focus!`,
+            `Eyes on the code, not on ${appName}! 😠`
+        ];
+
         const randomWarning = warnings[Math.floor(Math.random() * warnings.length)];
         speak(randomWarning, 4000);
         lastWarningSpeakTime = now;
@@ -630,22 +611,22 @@ const timerOverlay = document.getElementById('timer-overlay');
 window.startPomodoro = (minutes) => {
     window.stopPomodoro();
     pomodoroTimeLeft = minutes * 60;
-    
+
     timerOverlay.style.display = 'block';
     updateTimerDisplay();
-    
+
     speak(`Starting a ${minutes} minute session. You got this!`);
-    
+
     pomodoroInterval = setInterval(() => {
         pomodoroTimeLeft--;
         updateTimerDisplay();
-        
+
         if (pomodoroTimeLeft <= 10) {
             timerOverlay.classList.add('pulse');
         } else {
             timerOverlay.classList.remove('pulse');
         }
-        
+
         if (pomodoroTimeLeft <= 0) {
             window.stopPomodoro();
             timerOverlay.style.display = 'block';
