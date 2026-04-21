@@ -157,15 +157,17 @@ window.flipBuddy = (e) => {
         if (isFlipped) {
             closeRadialMenu();
             closeBottomBar();
+            if (nameInputContainer) nameInputContainer.style.display = 'none';
         }
     }
 };
 
 window.toggleNameInput = () => {
     if (nameInputContainer) {
-        const isHidden = nameInputContainer.style.display === 'none' || !nameInputContainer.style.display;
-        nameInputContainer.style.display = isHidden ? 'flex' : 'none';
-        if (isHidden) {
+        closeRadialMenu(); // Close radial menu when renaming
+        const isCurrentlyHidden = nameInputContainer.style.display === 'none' || !nameInputContainer.style.display;
+        nameInputContainer.style.display = isCurrentlyHidden ? 'flex' : 'none';
+        if (isCurrentlyHidden && nameInput) {
             nameInput.value = buddyName;
             setTimeout(() => nameInput.focus(), 50);
         }
@@ -446,9 +448,16 @@ const radialMenuData = {
 
 window.openRadialMenu = (viewId) => {
     closeBottomBar();
+    if (nameInputContainer) nameInputContainer.style.display = 'none'; // Hide rename input when menu opens
     radialContainer.innerHTML = '';
-    const nodes = radialMenuData[viewId];
-    if (!nodes) return;
+    const nodes = [...(radialMenuData[viewId] || [])];
+
+    // Add Rename option if flipped and in main menu
+    if (viewId === 'main' && buddy && buddy.classList.contains('flipped')) {
+        nodes.push({ angle: 0, icon: '✏️', action: () => window.toggleNameInput(), color: 'btn-purple' });
+    }
+
+    if (nodes.length === 0) return;
     nodes.forEach((node, index) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'radial-btn-wrapper';
